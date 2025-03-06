@@ -22,7 +22,7 @@ Before you begin, ensure that you have the following installed:
 
 ## Installation
 
-1.  **Clone the repository:**
+1.  **Clone the repository:** install lfs extension for git [download](https://git-lfs.com/)
 
     ```
     git clone https://github.com/realvoidgojo/VideoAnalytics-OSINT
