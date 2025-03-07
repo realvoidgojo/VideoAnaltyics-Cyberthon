@@ -362,36 +362,35 @@ const VideoDisplay = () => {
   }, [taskID]);
 
   return (
-    <div style={{ position: "relative" }}>
+    <div className="relative">
       <input
         type="file"
         accept="video/*"
         onChange={handleVideoUpload}
         ref={fileInputRef}
-        style={{
-          border: "1px solid #ccc",
-          padding: "8px",
-          margin: "10px",
-          borderRadius: "6px",
-          backgroundColor: "#000f",
-        }}
+        className="border border-gray-300 p-2 m-4 rounded-lg bg-black-100"
       />
 
       <select
         value={selectedModel}
         onChange={(e) => setSelectedModel(e.target.value)}
-        style={{
-          border: "1px solid #ccc",
-          padding: "8px",
-          margin: "10px",
-          borderRadius: "6px",
-        }}
+        className="border border-gray-300 p-2 m-4 rounded-lg"
       >
-        <option value="yolov11n.pt">YOLOv11n</option>
-        <option value="yolov11s.pt">YOLOv11s</option>
-        <option value="yolov11m.pt">YOLOv11m</option>
-        <option value="yolov11l.pt">YOLOv11l</option>
-        <option value="yolov11x.pt">YOLOv11x</option>
+        <option value="yolov11n.pt" className="bg-gray-00">
+          YOLOv11n
+        </option>
+        <option value="yolov11s.pt" className="bg-gray-600">
+          YOLOv11s
+        </option>
+        <option value="yolov11m.pt" className="bg-gray-600">
+          YOLOv11m
+        </option>
+        <option value="yolov11l.pt" className="bg-gray-600">
+          YOLOv11l
+        </option>
+        <option value="yolov11x.pt" className="bg-gray-600">
+          YOLOv11x
+        </option>
       </select>
 
       {/* Add a condition where to process the video */}
@@ -400,121 +399,60 @@ const VideoDisplay = () => {
         <button
           onClick={handleStartProcessing}
           disabled={isProcessing}
-          style={{
-            padding: "8px 12px",
-            fontSize: "14px",
-            cursor: "pointer",
-            backgroundColor: "#4CAF50",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            margin: "10px",
-          }}
+          className={`px-4 py-2 text-sm cursor-pointer rounded-lg ${
+            isProcessing ? "bg-gray-400" : "bg-green-600"
+          } text-white`}
         >
           {isProcessing ? "Processing..." : "Start Processing"}
         </button>
       )}
 
       <label>
-        <span style={{ fontSize: 15, marginLeft: 10, marginRight: 10 }}>
-          Frames
-        </span>
+        <span className="text-sm ml-4 mr-4">Frames</span>
         <input
           type="number"
           value={frameInterval}
           onChange={(e) => setFrameInterval(parseInt(e.target.value, 10))}
           min="1" // Ensure interval is at least 1
-          style={{
-            border: "1px solid #ccc",
-            padding: "8px",
-            margin: "10px",
-            borderRadius: "6px",
-            width: "35px",
-          }}
+          className="border border-gray-300 p-2 m-4 rounded-lg w-14"
         />
       </label>
-      <label style={{ marginLeft: 10, marginRight: 10 }}>
-        <span style={{ fontSize: 15, marginLeft: 10, marginRight: 10 }}>
-          Container Width:
-        </span>
+      <label className="ml-4 mr-4">
+        <span className="text-sm ml-4 mr-4">Container Width:</span>
         <input
           type="number"
           value={containerWidth}
           onChange={(e) => setContainerWidth(parseInt(e.target.value, 10))}
           min="100" // Ensure container width is at least 100px
-          style={{
-            border: "1px solid #ccc",
-            padding: "8px",
-            margin: "10px",
-            borderRadius: "6px",
-            width: "55px",
-          }}
+          className="border border-gray-300 p-2 m-4 rounded-lg w-20"
         />
       </label>
 
       {/* Reset and Stop buttons */}
       <button
         onClick={handleReset}
-        style={{
-          padding: "8px 12px",
-          fontSize: "14px",
-          cursor: "pointer",
-          backgroundColor: "#f44336",
-          color: "white",
-          border: "none",
-          borderRadius: "4px",
-        }}
+        className="px-4 py-2 text-sm cursor-pointer rounded-lg bg-red-500 text-white"
       >
         Reset
       </button>
       <button
         onClick={handleStopResume}
-        style={{
-          padding: "8px 12px",
-          fontSize: "14px",
-          cursor: "pointer",
-          backgroundColor: isVideoPaused ? "#4CAF50" : "#f44336",
-          color: "white",
-          border: "none",
-          borderRadius: "4px",
-          marginLeft: "10px",
-        }}
+        className={`px-4 py-2 text-sm cursor-pointer rounded-lg ml-4 ${
+          isVideoPaused ? "bg-green-500" : "bg-red-500"
+        } text-white`}
       >
         {isVideoPaused ? "Resume" : "Stop"}
       </button>
 
       {/* Class Color Customization */}
-      <div
-        style={{
-          border: "1px solid #ccc",
-          padding: "15px",
-          borderRadius: "6px",
-          marginTop: "20px",
-        }}
-      >
-        <h6
-          style={{ fontSize: "24px", marginBottom: "15px", marginTop: "10px" }}
-        >
-          Customize Class Colors
-        </h6>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "10px",
-          }}
-        >
+      <div className="border border-gray-300 p-4 rounded-lg mt-8">
+        <h6 className="text-2xl mb-4 mt-4">Customize Class Colors</h6>
+        <div className="grid grid-cols-2 gap-4">
           {Array.from(
             new Set(detections.flat().map((det) => det.class_name))
           ).map((className) => (
-            <div
-              key={className}
-              style={{ display: "flex", alignItems: "center" }}
-            >
-              <label
-                htmlFor={`${className}-color`}
-                style={{ flex: "1", fontSize: "18px" }}
-              >
+            <div key={className} className="flex items-center">
+              <label htmlFor={`${className}-color`} className="flex-1 text-lg">
                 {className}:
               </label>
               <input
@@ -524,7 +462,7 @@ const VideoDisplay = () => {
                 onChange={(e) =>
                   handleClassColorChange(className, e.target.value)
                 }
-                style={{ margin: "10px", flex: "1" }}
+                className="ml-4 flex-1"
               />
             </div>
           ))}
@@ -532,31 +470,21 @@ const VideoDisplay = () => {
       </div>
 
       {videoSource && (
-        <div style={{ position: "relative" }}>
-          <video
-            ref={videoRef}
-            src={videoSource}
-            controls
-            style={{
-              zIndex: 1,
-              position: "relative",
-              width: `${containerWidth}px`,
-              height: "auto",
-              objectFit: "contain",
-            }}
-          />
-          <canvas
-            ref={canvasRef}
-            style={{
-              position: "relative",
-              top: 0,
-              left: 0,
-              zIndex: 2,
-              padding: "5px",
-              pointerEvents: "none",
-              marginTop: "10px",
-            }}
-          />
+        <div className="flex flex-row w-full p-4">
+          <div className="w-1/2 mr-4">
+            <video
+              ref={videoRef}
+              src={videoSource}
+              controls
+              className="w-full h-auto object-contain"
+            />
+          </div>
+          <div className="w-1/2">
+            <canvas
+              ref={canvasRef}
+              className="w-full h-auto pointer-events-none"
+            />
+          </div>
         </div>
       )}
     </div>
