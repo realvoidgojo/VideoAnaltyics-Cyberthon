@@ -25,8 +25,8 @@ Before you begin, ensure that you have the following installed:
 1.  **Clone the repository:** install lfs extension for git [download](https://git-lfs.com/)
 
     ```
-    git clone https://github.com/realvoidgojo/VideoAnalytics-OSINT
-    cd VideoAnalytics-OSINT
+    git clone https://github.com/realvoidgojo/VideoAnaltyics-Cyberthon.git
+    cd VideoAnaltyics-Cyberthon
     ```
 
 2.  **Backend Setup (Flask & Celery):**
