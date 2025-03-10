@@ -1,4 +1,4 @@
-import VideoDisplay from "./components/VideoDisplay";
+import VideoDisplay from "./pages/VideoDisplay";
 import "./App.css";
 
 function App() {
