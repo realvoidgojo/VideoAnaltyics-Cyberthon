@@ -1,5 +1,5 @@
-// ProcessingControls.jsx
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 const ProcessingControls = ({
   onStartProcessing,
@@ -9,11 +9,20 @@ const ProcessingControls = ({
   isVideoPaused,
   hasVideoUploaded,
 }) => {
+  const navigate = useNavigate();
+
+  const handleStartProcessing = () => {
+    if (!isProcessing) {
+      onStartProcessing(); // Call the original function
+      navigate("/result"); // Navigate to the /result page
+    }
+  };
+
   return (
     <div>
       {hasVideoUploaded && (
         <button
-          onClick={onStartProcessing}
+          onClick={handleStartProcessing}
           disabled={isProcessing}
           className={`px-4 py-2 text-sm cursor-pointer rounded-lg ${
             isProcessing ? "bg-gray-400" : "bg-green-600"
