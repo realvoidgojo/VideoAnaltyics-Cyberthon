@@ -56,6 +56,11 @@ def task_status(task_id):
             'state': task.state,
             'status': 'Pending...'
         }
+    elif task.state == 'REVOKED':
+        response = {
+            'state': 'REVOKED',
+            'status': 'Task was cancelled by user'
+        }
     elif task.state != 'FAILURE':
         response = {
             'state': task.state,
@@ -73,8 +78,51 @@ def task_status(task_id):
 
 @app.route('/reset_processing', methods=['POST'])
 def reset_processing():
-    """Not implemented."""
-    return jsonify({'message': 'Not implemented'})
+    """Stops the currently running task and resets the processing state."""
+    try:
+        task_id = request.json.get('task_id')
+        if task_id:
+            # Get the task object
+            task = process_video_task.AsyncResult(task_id)
+            current_state = task.state
+            logging.info(f"Current task state before revocation: {current_state}")
+            
+            # Add to revoked set in Redis backend - this will be checked by is_revoked()
+            from src.celery import celery_app
+            try:
+                # Add to the revoked tasks set with terminate=True to forcefully terminate the task
+                celery_app.control.revoke(task_id, terminate=True, signal='SIGTERM')
+                
+                # Mark the task as revoked in the backend - this will be detected by our custom check
+                celery_app.backend.set(f"task-revoked-{task_id}", "1")
+                celery_app.backend.mark_as_revoked(task_id, reason='User requested cancellation')
+                logging.info(f"Task {task_id} has been marked as revoked")
+                
+                # Store the state directly in Redis for our custom check
+                celery_app.backend.store_result(task_id, None, 'REVOKED')
+                
+                # Also update the task state directly if possible
+                try:
+                    task.update_state(state='REVOKED', meta={'status': 'Task cancelled by user'})
+                except Exception as state_err:
+                    logging.warning(f"Error updating task state: {str(state_err)}")
+            except Exception as term_err:
+                logging.warning(f"Error revoking task: {str(term_err)}")
+            
+            # Force terminate any running worker processes for this task
+            try:
+                # This is more aggressive termination
+                celery_app.control.terminate(task_id, signal='SIGKILL')
+            except Exception as kill_err:
+                logging.warning(f"Error terminating task process: {str(kill_err)}")
+                
+            logging.info(f"Task {task_id} has been revoked - will terminate at next checkpoint")
+            return jsonify({'message': f'Task {task_id} has been flagged for cancellation', 'state': 'REVOKED'})
+        else:
+            return jsonify({'error': 'No task_id provided'}), 400
+    except Exception as e:
+        logging.error(f"Error in reset_processing: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 # End point to pause the video
 @app.route('/pause_processing', methods=['POST'])

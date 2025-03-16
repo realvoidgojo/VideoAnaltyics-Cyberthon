@@ -1,0 +1,3 @@
+ cd frontend/ npm run dev
+ celery -A src.celery.celery_app worker --loglevel=info --pool=threads -c 4
+ python app.py

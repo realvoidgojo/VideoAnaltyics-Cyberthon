@@ -44,14 +44,28 @@ const useVideoProcessing = () => {
   };
 
   const handleReset = async () => {
-    // Send signal to backend to skip current processing
-    try {
-      await axios.post("http://localhost:5000/reset_processing");
-      console.log("Processing reset signal sent to the backend.");
-    } catch (error) {
-      console.error("Error sending reset signal:", error);
+    // Send signal to backend to stop the current task and reset processing
+    if (taskID) {
+      try {
+        const response = await axios.post("http://localhost:5000/reset_processing", {
+          task_id: taskID
+        });
+        console.log(`Processing reset signal sent to the backend for task ${taskID}.`);
+        console.log(`Task state: ${response.data.state}`);
+        
+        // Force UI to return to idle state
+        if (response.data.state === 'REVOKED') {
+          setTaskID(null);
+          setIsProcessing(false);
+          setIsVideoPaused(false);
+        }
+      } catch (error) {
+        console.error("Error sending reset signal:", error);
+      }
     }
     setTaskID(null);
+    setIsProcessing(false);
+    setIsVideoPaused(false);
   };
 
   const pauseVideoProcessing = async () => {
