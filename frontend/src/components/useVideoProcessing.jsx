@@ -6,18 +6,24 @@ const useVideoProcessing = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isVideoPaused, setIsVideoPaused] = useState(false);
   const [taskID, setTaskID] = useState(null);
+  const [useHeatmap, setUseHeatmap] = useState(false);
 
   const handleStartProcessing = async (
     selectedFile,
     selectedModel,
-    frameInterval
+    frameInterval,
+    useHeatmap
   ) => {
     setIsProcessing(true);
 
+    // Convert frameInterval to integer and ensure it's a valid number
+    const interval = parseInt(frameInterval, 10) || 1;
+    
     const formData = new FormData();
     formData.append("video", selectedFile);
     formData.append("model", selectedModel);
-    formData.append("interval", frameInterval);
+    formData.append("interval", interval);
+    formData.append("use_heatmap", useHeatmap ? "true" : "false");
 
     try {
       const response = await axios.post(
@@ -99,6 +105,8 @@ const useVideoProcessing = () => {
     isProcessing,
     isVideoPaused,
     taskID,
+    useHeatmap,
+    setUseHeatmap,
     handleStartProcessing,
     handleReset,
     handleStopResume,

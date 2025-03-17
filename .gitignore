@@ -7,7 +7,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
+/home/lad/cyber/VideoAnaltyics-Cyberthon/cmd.txt
 # Log files
 *.log
 

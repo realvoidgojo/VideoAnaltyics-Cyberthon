@@ -7,6 +7,9 @@ import FrameIntervalInput from "../components/FrameIntervalInput";
 import ContainerWidthInput from "../components/ContainerWidthInput";
 import ClassColorCustomization from "../components/ClassColorCustomization";
 import VideoCanvas from "../components/VideoCanvas";
+import HeatmapCheckbox from "../components/HeatmapCheckbox";
+import HeatmapDownload from "../components/HeatmapDownload";
+import HeatmapView from "../components/HeatmapView";
 import useVideoProcessing from "../components/useVideoProcessing";
 import useDetections from "../components/UseDetections";
 import { getDistinctColor } from "./utils/colorUtils";
@@ -22,12 +25,15 @@ const VideoDisplay = () => {
   const [containerWidth, setContainerWidth] = useState(720);
   const [classColors, setClassColors] = useState({});
   const [existingColors, setExistingColors] = useState([]);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   // Use custom hook for video processing logic
   const {
     isProcessing,
     isVideoPaused,
     taskID,
+    useHeatmap,
+    setUseHeatmap,
     handleStartProcessing,
     handleReset,
     handleStopResume,
@@ -41,6 +47,9 @@ const VideoDisplay = () => {
     originalHeight,
     preprocessedWidth,
     preprocessedHeight,
+    heatmapPath,
+    heatmapFrames,
+    useHeatmap: hasHeatmapData,
   } = useDetections(taskID);
 
   const handleVideoUpload = (event) => {
@@ -102,7 +111,7 @@ const VideoDisplay = () => {
   };
 
   const onStartVideoProcessing = () => {
-    handleStartProcessing(selectedFile, selectedModel, frameInterval);
+    handleStartProcessing(selectedFile, selectedModel, frameInterval, useHeatmap);
   };
 
   return (
@@ -131,21 +140,52 @@ const VideoDisplay = () => {
         containerWidth={containerWidth}
         setContainerWidth={(value) => setContainerWidth(value)}
       />
+      <HeatmapCheckbox
+        useHeatmap={useHeatmap}
+        setUseHeatmap={setUseHeatmap}
+      />
+      <HeatmapDownload heatmapPath={heatmapPath} />
+      
+      {/* Toggle View Button - Only show if heatmap data is available */}
+      {hasHeatmapData && heatmapFrames && heatmapFrames.length > 0 && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowHeatmap(!showHeatmap)}
+            className={`px-4 py-2 text-sm rounded-lg ${
+              showHeatmap ? "bg-blue-600" : "bg-green-600"
+            } text-white`}
+          >
+            {showHeatmap ? "Show Detection View" : "Show Heatmap View"}
+          </button>
+        </div>
+      )}
+      
       <ClassColorCustomization
         detections={detections}
         classColors={classColors}
         onClassColorChange={handleClassColorChange}
       />
-      <VideoCanvas
-        videoSource={videoSource}
-        detections={detections}
-        originalWidth={originalWidth}
-        originalHeight={originalHeight}
-        preprocessedWidth={preprocessedWidth}
-        preprocessedHeight={preprocessedHeight}
-        containerWidth={containerWidth}
-        classColors={classColors}
-      />
+      
+      {/* Conditional rendering based on view state */}
+      {showHeatmap && hasHeatmapData ? (
+        <HeatmapView
+          videoSource={videoSource}
+          heatmapFrames={heatmapFrames}
+          containerWidth={containerWidth}
+          visible={true}
+        />
+      ) : (
+        <VideoCanvas
+          videoSource={videoSource}
+          detections={detections}
+          originalWidth={originalWidth}
+          originalHeight={originalHeight}
+          preprocessedWidth={preprocessedWidth}
+          preprocessedHeight={preprocessedHeight}
+          containerWidth={containerWidth}
+          classColors={classColors}
+        />
+      )}
     </div>
   );
 };

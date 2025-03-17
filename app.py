@@ -39,12 +39,15 @@ def process_video():
 
     frame_interval = int(request.form.get('interval', 1))
     print(f"Request for frame interval {frame_interval}")
+    
+    use_heatmap = request.form.get('use_heatmap', 'false')
+    print(f"Use heatmap: {use_heatmap}")
 
     # Save the uploaded video to a temporary location
     video_path = os.path.join('data', video_file.filename)  # Use the 'data' directory
     video_file.save(video_path)
 
-    task = process_video_task.delay(video_path, model_name, frame_interval)
+    task = process_video_task.delay(video_path, model_name, frame_interval, use_heatmap)
     return jsonify({'task_id': task.id, 'message': 'Processing started in background'})
 
 @app.route('/task_status/<task_id>', methods=['GET'])
@@ -135,6 +138,24 @@ def pause_processing():
 def resume_processing():
     """Not implemented"""
     return jsonify({'message': 'Not implemented'})
+
+@app.route('/download_heatmap/<path:filename>', methods=['GET'])
+def download_heatmap(filename):
+    """Serves the heatmap video file for download."""
+    try:
+        from flask import send_file
+        # Ensure the filename is valid
+        if '..' in filename or filename.startswith('/'):
+            return jsonify({'error': 'Invalid file path'}), 400
+        
+        # The heatmap file should be in the data directory
+        file_path = os.path.join('data', filename)
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Heatmap file not found'}), 404
+        
+        return send_file(file_path, as_attachment=True)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

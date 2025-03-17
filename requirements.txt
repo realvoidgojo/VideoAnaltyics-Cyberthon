@@ -54,3 +54,7 @@ wcwidth==0.2.13
 Werkzeug==3.1.3
 lap==0.5.12
 redis==5.0.1
+progress==1.6
+opencv-contrib-python==4.11.0.86
+# For heatmap processing
+numpy>=1.20.0

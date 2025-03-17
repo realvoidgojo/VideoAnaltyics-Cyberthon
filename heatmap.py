@@ -51,17 +51,20 @@ def extract_frames(video_path: str, output_video_path: str) -> int:
 
 def main():
     setup_logging()
-    parser = argparse.ArgumentParser(description='Heatmap Video Generator')
-    parser.add_argument('--input', type=str, help='Output video path', required=True)
-    parser.add_argument('--output', type=str, help='Output video path', default='output/heatmap.mp4')
+    parser = argparse.ArgumentParser(description='Generate heatmap from video.')
+    parser.add_argument('--input', required=True, help='Path to input video file')
+    parser.add_argument('--output', required=True, help='Path to output video file')
     args = parser.parse_args()
-    
-    video_path = args.input
+
+    input_video_path = args.input
     output_video_path = args.output
-    
-    os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
-    
-    length = extract_frames(video_path, output_video_path)
+
+    # Ensure the output directory exists
+    output_dir = os.path.dirname(output_video_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+    length = extract_frames(input_video_path, output_video_path)
     
     logging.info("Processing completed successfully!")
 
