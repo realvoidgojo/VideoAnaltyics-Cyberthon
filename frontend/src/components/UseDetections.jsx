@@ -9,6 +9,9 @@ const useDetections = (taskID) => {
   const [preprocessedWidth, setPreprocessedWidth] = useState(0);
   const [preprocessedHeight, setPreprocessedHeight] = useState(0);
   const [processingStatus, setProcessingStatus] = useState("");
+  const [heatmapFrames, setHeatmapFrames] = useState([]);
+  const [useHeatmap, setUseHeatmap] = useState(false);
+  const [heatmapPath, setHeatmapPath] = useState(null);
 
   const fetchTaskResult = async (task_id) => {
     try {
@@ -23,6 +26,20 @@ const useDetections = (taskID) => {
         setPreprocessedWidth(result.preprocessed_width || 0);
         setPreprocessedHeight(result.preprocessed_height || 0);
         setDetections(result.results || []);
+        
+        // Set heatmap frames if available
+        if (result.heatmap_frames && result.heatmap_frames.length > 0) {
+          setHeatmapFrames(result.heatmap_frames);
+          setUseHeatmap(result.use_heatmap || false);
+        }
+        
+        // Set heatmap path if available (legacy support)
+        if (result.heatmap_path) {
+          // Extract just the filename from the full path
+          const filename = result.heatmap_path.split('/').pop();
+          setHeatmapPath(`http://localhost:5000/download_heatmap/${filename}`);
+        }
+        
         setProcessingStatus("Completed");
       } else if (
         response.data.state === "PENDING" ||
@@ -61,6 +78,9 @@ const useDetections = (taskID) => {
     preprocessedWidth,
     preprocessedHeight,
     processingStatus,
+    heatmapPath,
+    heatmapFrames,
+    useHeatmap,
     setDetections,
   };
 };

@@ -6,18 +6,24 @@ const useVideoProcessing = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isVideoPaused, setIsVideoPaused] = useState(false);
   const [taskID, setTaskID] = useState(null);
+  const [useHeatmap, setUseHeatmap] = useState(false);
 
   const handleStartProcessing = async (
     selectedFile,
     selectedModel,
-    frameInterval
+    frameInterval,
+    useHeatmap
   ) => {
     setIsProcessing(true);
+
+    // Convert frameInterval to integer and ensure it's a valid number
+    const interval = parseInt(frameInterval, 10) || 1;
 
     const formData = new FormData();
     formData.append("video", selectedFile);
     formData.append("model", selectedModel);
-    formData.append("interval", frameInterval);
+    formData.append("interval", interval);
+    formData.append("use_heatmap", useHeatmap ? "true" : "false");
 
     try {
       const response = await axios.post(
@@ -44,14 +50,33 @@ const useVideoProcessing = () => {
   };
 
   const handleReset = async () => {
-    // Send signal to backend to skip current processing
-    try {
-      await axios.post("http://localhost:5000/reset_processing");
-      console.log("Processing reset signal sent to the backend.");
-    } catch (error) {
-      console.error("Error sending reset signal:", error);
+    // Send signal to backend to stop the current task and reset processing
+    if (taskID) {
+      try {
+        const response = await axios.post(
+          "http://localhost:5000/reset_processing",
+          {
+            task_id: taskID,
+          }
+        );
+        console.log(
+          `Processing reset signal sent to the backend for task ${taskID}.`
+        );
+        console.log(`Task state: ${response.data.state}`);
+
+        // Force UI to return to idle state
+        if (response.data.state === "REVOKED") {
+          setTaskID(null);
+          setIsProcessing(false);
+          setIsVideoPaused(false);
+        }
+      } catch (error) {
+        console.error("Error sending reset signal:", error);
+      }
     }
     setTaskID(null);
+    setIsProcessing(false);
+    setIsVideoPaused(false);
   };
 
   const pauseVideoProcessing = async () => {
@@ -85,6 +110,8 @@ const useVideoProcessing = () => {
     isProcessing,
     isVideoPaused,
     taskID,
+    useHeatmap,
+    setUseHeatmap,
     handleStartProcessing,
     handleReset,
     handleStopResume,
