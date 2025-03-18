@@ -9,7 +9,7 @@ const VideoUpload = ({ onVideoUpload, fileInputRef }) => {
         accept="video/*"
         onChange={onVideoUpload}
         ref={fileInputRef}
-        className="border border-gray-300 p-2 m-4 rounded-lg bg-black-100"
+        className="border text-gray-900 border-gray-300 p-2 m-4 rounded-lg bg-black-100"
       />
     </div>
   );

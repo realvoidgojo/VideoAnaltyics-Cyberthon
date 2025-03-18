@@ -6,7 +6,7 @@ const ModelSelection = ({ selectedModel, onModelChange }) => {
     <select
       value={selectedModel}
       onChange={onModelChange}
-      className="border border-gray-300 p-2 m-4 rounded-lg"
+      className=" text-gray-900 border border-gray-300 p-2 m-4 rounded-lg"
     >
       <option value="yolov11n.pt" className="bg-gray-00">
         YOLOv11n
