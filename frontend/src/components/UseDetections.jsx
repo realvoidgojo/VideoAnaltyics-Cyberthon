@@ -12,6 +12,8 @@ const useDetections = (taskID) => {
   const [heatmapFrames, setHeatmapFrames] = useState([]);
   const [useHeatmap, setUseHeatmap] = useState(false);
   const [heatmapPath, setHeatmapPath] = useState(null);
+  const [heatmapAnalysis, setHeatmapAnalysis] = useState({});
+  const [heatmapVideoUrl, setHeatmapVideoUrl] = useState(null);
 
   const fetchTaskResult = async (task_id) => {
     try {
@@ -27,27 +29,54 @@ const useDetections = (taskID) => {
         setPreprocessedHeight(result.preprocessed_height || 0);
         setDetections(result.results || []);
         
-        // Set heatmap frames if available
-        if (result.heatmap_frames && result.heatmap_frames.length > 0) {
-          setHeatmapFrames(result.heatmap_frames);
-          setUseHeatmap(result.use_heatmap || false);
-        }
-        
-        // Set heatmap path if available (legacy support)
-        if (result.heatmap_path) {
-          // Extract just the filename from the full path
-          const filename = result.heatmap_path.split('/').pop();
-          setHeatmapPath(`http://localhost:5000/download_heatmap/${filename}`);
+        // Always check useHeatmap flag first
+        if (result.use_heatmap) {
+          console.log("Heatmap was requested for this task");
+          setUseHeatmap(true);
+          
+          // Set heatmap video URL if heatmap is enabled, even if we don't have frames yet
+          if (task_id) {
+            setHeatmapVideoUrl(`http://localhost:5000/stream_heatmap_video/${task_id}`);
+            console.log(`Set heatmap video URL for task ${task_id}`);
+          }
+          
+          // Set heatmap frames if available
+          if (result.heatmap_frames && result.heatmap_frames.length > 0) {
+            console.log(`Received ${result.heatmap_frames.length} heatmap frames`);
+            setHeatmapFrames(result.heatmap_frames);
+          } else {
+            console.log("No heatmap frames available in result");
+          }
+          
+          // Set heatmap analysis data if available
+          if (result.heatmap_analysis) {
+            console.log("Setting heatmap analysis data:", result.heatmap_analysis);
+            setHeatmapAnalysis(result.heatmap_analysis);
+          } else {
+            console.log("No heatmap analysis data in result");
+          }
+        } else {
+          // Make sure heatmap is disabled if not requested
+          setUseHeatmap(false);
         }
         
         setProcessingStatus("Completed");
       } else if (
         response.data.state === "PENDING" ||
-        response.data.state === "PROCESSING"
+        response.data.state === "PROCESSING" ||
+        response.data.state === "PROGRESS" 
       ) {
-        setProcessingStatus("Processing...");
+        const status = response.data.status || {};
+        const progressText = status.percent ? `(${status.percent}%)` : '';
+        const statusText = status.status || 'Processing...';
+        setProcessingStatus(`${statusText} ${progressText}`);
       } else if (response.data.state === "FAILURE") {
         setProcessingStatus(`Failed: ${response.data.status}`);
+      } else if (response.data.state === "REVOKED") {
+        // Handle revoked tasks
+        setProcessingStatus(`Task cancelled by user`);
+        // Stop polling for this task
+        return false;
       }
     } catch (error) {
       console.error("Error fetching task result:", error);
@@ -59,10 +88,16 @@ const useDetections = (taskID) => {
     let intervalId;
     if (taskID) {
       intervalId = setInterval(() => {
-        fetchTaskResult(taskID);
+        // If fetchTaskResult returns false, it means we should stop polling
+        const result = fetchTaskResult(taskID);
+        if (result === false) {
+          clearInterval(intervalId);
+        }
       }, 2000);
     }
-    return () => clearInterval(intervalId);
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [taskID]);
 
   useEffect(() => {
@@ -81,6 +116,8 @@ const useDetections = (taskID) => {
     heatmapPath,
     heatmapFrames,
     useHeatmap,
+    heatmapAnalysis,
+    heatmapVideoUrl,
     setDetections,
   };
 };

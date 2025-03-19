@@ -12,9 +12,11 @@ const useVideoProcessing = () => {
     selectedFile,
     selectedModel,
     frameInterval,
-    useHeatmap
+    useHeatmapValue
   ) => {
     setIsProcessing(true);
+    // Update local state to match what's being sent
+    setUseHeatmap(useHeatmapValue);
 
     // Convert frameInterval to integer and ensure it's a valid number
     const interval = parseInt(frameInterval, 10) || 1;
@@ -23,7 +25,7 @@ const useVideoProcessing = () => {
     formData.append("video", selectedFile);
     formData.append("model", selectedModel);
     formData.append("interval", interval);
-    formData.append("use_heatmap", useHeatmap ? "true" : "false");
+    formData.append("use_heatmap", useHeatmapValue ? "true" : "false");
 
     try {
       const response = await axios.post(
@@ -37,9 +39,11 @@ const useVideoProcessing = () => {
       );
       setTaskID(response.data.task_id);
       console.log("Task ID:", response.data.task_id);
+      console.log("Heatmap enabled:", useHeatmapValue);
       alert(
         "Processing started in background with task ID: " +
-          response.data.task_id
+          response.data.task_id +
+          (useHeatmapValue ? " (with heatmap analysis)" : "")
       );
     } catch (error) {
       console.error("Error processing video:", error);
@@ -53,30 +57,41 @@ const useVideoProcessing = () => {
     // Send signal to backend to stop the current task and reset processing
     if (taskID) {
       try {
+        // Set processing to true to indicate operation in progress
+        setIsProcessing(true);
+        
         const response = await axios.post(
           "http://localhost:5000/reset_processing",
           {
             task_id: taskID,
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            }
           }
         );
-        console.log(
-          `Processing reset signal sent to the backend for task ${taskID}.`
-        );
-        console.log(`Task state: ${response.data.state}`);
-
+        
+        console.log(`Processing reset signal sent to the backend for task ${taskID}.`);
+        console.log(`Response:`, response.data);
+        
         // Force UI to return to idle state
-        if (response.data.state === "REVOKED") {
-          setTaskID(null);
-          setIsProcessing(false);
-          setIsVideoPaused(false);
-        }
+        alert(`Task ${taskID} was cancelled by user.`);
       } catch (error) {
         console.error("Error sending reset signal:", error);
+        alert("Error cancelling task. Please try again.");
+      } finally {
+        // Always reset the state
+        setTaskID(null);
+        setIsProcessing(false);
+        setIsVideoPaused(false);
       }
+    } else {
+      // Even if no task is running, reset the UI state
+      setTaskID(null);
+      setIsProcessing(false);
+      setIsVideoPaused(false);
     }
-    setTaskID(null);
-    setIsProcessing(false);
-    setIsVideoPaused(false);
   };
 
   const pauseVideoProcessing = async () => {
