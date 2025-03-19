@@ -15,7 +15,7 @@ const ProcessingControls = ({
         <button
           onClick={onStartProcessing}
           disabled={isProcessing}
-          className={`px-4 py-2 text-sm cursor-pointer rounded-lg ${
+          className={`px-4 py-2 text-sm cursor-pointer rounded-lg mr-4 ${
             isProcessing ? "bg-gray-400" : "bg-green-600"
           } text-white`}
         >

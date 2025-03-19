@@ -18,7 +18,10 @@ const HeatmapCheckbox = ({ useHeatmap, setUseHeatmap }) => {
         </label>
       </div>
 
-      <p className="text-xs text-gray-600 mt-2">does the video is static</p>
+      <p className="text-xs text-gray-600 mt-2">
+        This static video feed includes a heatmap highlighting movement
+        intensity over time
+      </p>
     </div>
   );
 };
