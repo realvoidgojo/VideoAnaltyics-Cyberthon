@@ -14,3 +14,4 @@ __pycache__/
 # Node.js (for your React frontend)
 node_modules/
 models/
+*.pt

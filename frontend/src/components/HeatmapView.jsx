@@ -61,6 +61,14 @@ const HeatmapView = ({
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     
+    // Pause and reset video when view is hidden or displayed
+    if (!visible) {
+      if (video && !video.paused) {
+        video.pause();
+      }
+      return;
+    }
+    
     const updateHeatmapFrame = () => {
       if (video.paused || !preloadedImages.current.length) return;
       
@@ -96,6 +104,11 @@ const HeatmapView = ({
     return () => {
       cancelAnimationFrame(frameRequestId);
       video.removeEventListener("play", handlePlay);
+      
+      // Make sure to pause the video when unmounting/changing visibility
+      if (video && !video.paused) {
+        video.pause();
+      }
     };
   }, [heatmapFrames, currentFrameIndex, visible]);
 
