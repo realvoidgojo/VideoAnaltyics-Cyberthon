@@ -205,4 +205,4 @@ https://github.com/user-attachments/assets/6676dffa-0451-43ef-a0bf-6a1b65836654
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit pull requests or open issues to suggest improvements or report bugs.
+Contributions are welcome! Please feel free to submit pull requests or open issues to suggest improvements or report bugs.pull
