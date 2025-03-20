@@ -38,17 +38,20 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
     Checks for task cancellation during processing.
     """
     try:
-        # First check at the very beginning if task is already cancelled
+        # Add safer task cancellation check
         task_id = self.request.id
-        # Get async result object
-        task_result = celery_app.AsyncResult(task_id)
-        # Check if already revoked
-        if task_result.state == 'REVOKED':
-            logger.warning(f"Task {task_id} was already cancelled before starting")
-            self.update_state(state='REVOKED', 
-                             meta={'status': 'Task cancelled by user before processing started'})
-            return {'error': 'Task cancelled by user', 'exc_type': 'TaskCancellation'}
-        
+        if task_id:
+            try:
+                task_result = celery_app.AsyncResult(task_id)
+                if task_result and task_result.state == 'REVOKED':
+                    logger.warning(f"Task {task_id} was already cancelled before starting")
+                    return {
+                        'error': 'Task cancelled by user',
+                        'state': 'REVOKED'
+                    }
+            except Exception as e:
+                logger.error(f"Error checking task state: {e}")
+
         # Add progress tracking
         self.update_state(state='STARTED', meta={'status': 'Extracting frames'})
         
@@ -65,48 +68,62 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
         if use_heatmap.lower() == 'true':
             self.update_state(state='PROGRESS', meta={'status': 'Generating heatmap frames'})
             
-            # Check cancellation again before starting heatmap generation
+            try:
+                frame_interval_int = int(frame_interval)
+                heatmap_result = heatmap_analysis.generate_heatmap_frames(
+                    video_path, 
+                    frame_interval_int,
+                    self
+                )
+                
+                if not heatmap_result:
+                    logger.warning("Heatmap generation returned no results")
+                    heatmap_frames = []
+                    heatmap_analysis_data = {}
+                else:
+                    heatmap_frames = heatmap_result.get("frames", [])
+                    heatmap_analysis_data = {
+                        'peak_movement_time': heatmap_result.get("peak_movement_time", 0),
+                        'average_intensity': heatmap_result.get("average_intensity", 0),
+                        'movement_duration': heatmap_result.get("movement_duration", 0),
+                        'total_duration': heatmap_result.get("total_duration", 0)
+                    }
+                    
+            except heatmap_analysis.TaskCancelledError:
+                logger.warning(f"Task {task_id} was cancelled during heatmap generation")
+                return {
+                    'error': 'Task cancelled by user',
+                    'state': 'REVOKED'
+                }
+            except Exception as e:
+                logger.error(f"Error in heatmap generation: {str(e)}")
+                heatmap_frames = []
+                heatmap_analysis_data = {}
+
+            # Check cancellation again before starting heatmap video generation
             task_result = celery_app.AsyncResult(task_id)
             if task_result.state == 'REVOKED':
-                logger.warning(f"Task {task_id} was cancelled before heatmap generation")
+                logger.warning(f"Task {task_id} was cancelled before heatmap video generation")
                 self.update_state(state='REVOKED', 
-                                meta={'status': 'Task cancelled by user before heatmap generation'})
-                return {'error': 'Task cancelled by user', 'exc_type': 'TaskCancellation'}
+                               meta={'status': 'Task cancelled by user before heatmap video generation'})
+                # Create proper exception dict for Celery with the required format
+                exception_info = {
+                    'exc_type': 'TaskCancellation',
+                    'exc_message': ['Task cancelled by user'],  # Must be a list
+                    'exc_module': 'celery.exceptions'
+                }
+                return {'error': 'Task cancelled by user', **exception_info}
             
-            frame_interval_int = int(frame_interval)
+            # Create output filename with .avi extension (more compatible)
+            video_basename = os.path.basename(video_path)
+            video_name = os.path.splitext(video_basename)[0]
+            heatmap_video_path = os.path.join(tempfile.gettempdir(), f"heatmap_{video_name}.avi")
             
-            # APPROACH #1: TRY TO GENERATE HEATMAP FRAMES
-            try:
-                # Use the new heatmap_analysis module instead of the local function
-                heatmap_result = heatmap_analysis.generate_heatmap_frames(video_path, frame_interval_int, self)
-                if heatmap_result and isinstance(heatmap_result, dict) and "frames" in heatmap_result:
-                    heatmap_frames = heatmap_result.get("frames", [])
-                    logger.info(f"Successfully generated {len(heatmap_frames)} heatmap frames")
-                else:
-                    logger.warning("Heatmap frames generation returned invalid result")
-            except Exception as e:
-                import traceback
-                logger.error(f"Error generating heatmap frames: {e}")
-                logger.error(f"Traceback: {traceback.format_exc()}")
-                # Continue with processing even if heatmap frames generation fails
-                if "Task cancelled" in str(e):
-                    raise
-            
-            # APPROACH #2: TRY TO GENERATE HEATMAP VIDEO
-            try:
-                # Create output filename with .avi extension (more compatible)
-                video_basename = os.path.basename(video_path)
-                video_name = os.path.splitext(video_basename)[0]
-                heatmap_video_path = os.path.join(tempfile.gettempdir(), f"heatmap_{video_name}.avi")
-                
-                # Try to generate the heatmap video
-                heatmap_video = heatmap_analysis.generate_heatmap_video(video_path, heatmap_video_path)
-                logger.info(f"Generated heatmap video at: {heatmap_video}")
-                heatmap_video_path = heatmap_video  # Update path to returned value
-            except Exception as e:
-                logger.error(f"Error generating heatmap video: {e}")
-                heatmap_video_path = None
-            
+            # Try to generate the heatmap video
+            heatmap_video = heatmap_analysis.generate_heatmap_video(video_path, heatmap_video_path, self)
+            logger.info(f"Generated heatmap video at: {heatmap_video}")
+            heatmap_video_path = heatmap_video  # Update path to returned value
+
             # APPROACH #3: TRY TO EXTRACT ANALYSIS DATA
             try:
                 if heatmap_result and isinstance(heatmap_result, dict):
@@ -132,6 +149,20 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
                                 'heatmap_frames_count': len(heatmap_frames)
                             })
         
+        # Check cancellation again before starting object detection
+        task_result = celery_app.AsyncResult(self.request.id)
+        if task_result.state == 'REVOKED':
+            logger.warning(f"Task {self.request.id} was cancelled before object detection")
+            self.update_state(state='REVOKED', 
+                           meta={'status': 'Task cancelled by user before object detection'})
+            # Create proper exception dict for Celery
+            exception_info = {
+                'exc_type': 'TaskCancellation',
+                'exc_message': 'Task cancelled by user',
+                'exc_module': 'celery.exceptions'
+            }
+            return {'error': 'Task cancelled by user', **exception_info}
+            
         frames = video_processing.extract_frames(video_path, interval=int(frame_interval))
         total_frames = len(frames)
         all_results = []
@@ -148,6 +179,7 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
             if current_state == 'REVOKED' or is_revoked or task_result.state == 'REVOKED':
                 logger.warning(f"Task {self.request.id} was cancelled - stopping processing")
                 # Explicitly update state to show cancellation in UI
+                # Make sure this message appears exactly as 'Task cancelled by user' so the frontend can match it
                 self.update_state(state='REVOKED', 
                                  meta={
                                      'current': i, 
@@ -155,8 +187,11 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
                                      'status': 'Task cancelled by user',
                                      'error': 'Task cancelled by user'
                                  })
-                # Use a specific exception that can be caught and handled
-                raise Exception("Task cancelled by user")
+                # Create a properly formatted exception for Celery
+                class TaskCancellationError(Exception):
+                    pass
+                
+                raise TaskCancellationError("Task cancelled by user")
             
             # Update progress
             progress = int((i / total_frames) * 100) if total_frames > 0 else 0
@@ -212,10 +247,20 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
             'heatmap_video_path': heatmap_video_path
         }
 
+    except heatmap_analysis.TaskCancelledError:
+        logger.warning(f"Task {self.request.id} was cancelled")
+        return {
+            'exc_type': 'TaskCancelled',
+            'exc_message': ['Task cancelled by user'],
+            'exc_module': 'celery.exceptions'
+        }
     except Exception as e:
         logger.error(f"Processing Error: {str(e)}")
-        # Properly format exception for Celery
-        return {'error': str(e), 'exc_type': type(e).__name__}
+        return {
+            'exc_type': type(e).__name__,
+            'exc_message': [str(e)],
+            'exc_module': type(e).__module__
+        }
 
     finally:
         if os.path.exists(video_path):

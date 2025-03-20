@@ -178,6 +178,8 @@ def stream_heatmap_video(task_id):
         mimetype = 'video/mp4'
         if heatmap_video_path.endswith('.avi'):
             mimetype = 'video/x-msvideo'
+        
+        app.logger.info(f"Streaming heatmap video from {heatmap_video_path} with mimetype {mimetype}")
             
         # Return the video file for streaming
         # Set as_attachment=False to stream in browser instead of downloading
@@ -185,8 +187,7 @@ def stream_heatmap_video(task_id):
             heatmap_video_path, 
             mimetype=mimetype,
             as_attachment=False,
-            conditional=True,  # Enable conditional responses for range requests
-            etag=True         # Enable ETag header for caching
+            conditional=True  # Enable conditional responses for range requests
         )
         
         # Add headers to help with browser compatibility
@@ -194,12 +195,54 @@ def stream_heatmap_video(task_id):
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'  # Prevent caching
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
+        response.headers['Content-Type'] = mimetype  # Explicitly set Content-Type
+        response.headers['X-Content-Type-Options'] = 'nosniff'  # Prevent content type sniffing
+        # Add CORS headers to allow video streaming from different origins
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Range'
         
         app.logger.info(f"Successfully streaming heatmap video from {heatmap_video_path}")
         return response
     except Exception as e:
         logging.error(f"Error sending video file {heatmap_video_path}: {e}")
         return jsonify({'error': f'Error streaming video: {str(e)}'}), 500
+
+@app.route('/get_heatmap_video_info/<task_id>', methods=['GET'])
+def get_heatmap_video_info(task_id):
+    """Gets information about the heatmap video file for a task"""
+    task = process_video_task.AsyncResult(task_id)
+    
+    # Allow both SUCCESS and PROGRESS states
+    if task.state not in ['SUCCESS', 'PROGRESS']:
+        return jsonify({'error': 'Heatmap video not available for this task'}), 404
+    
+    # Get the heatmap video path from the task result
+    result = task.info
+    if not result or not isinstance(result, dict) or 'heatmap_video_path' not in result:
+        return jsonify({'error': 'Heatmap video path not found in task result'}), 404
+    
+    heatmap_video_path = result['heatmap_video_path']
+    
+    if not heatmap_video_path or not os.path.exists(heatmap_video_path):
+        return jsonify({'error': 'Heatmap video file not found'}), 404
+        
+    file_size = os.path.getsize(heatmap_video_path)
+    
+    # Get the file extension and MIME type
+    _, ext = os.path.splitext(heatmap_video_path)
+    mime_type = 'video/mp4'
+    if ext.lower() == '.avi':
+        mime_type = 'video/x-msvideo'
+    
+    return jsonify({
+        'path': heatmap_video_path,
+        'size': file_size,
+        'extension': ext,
+        'mime_type': mime_type,
+        'download_url': f'/download_heatmap_video/{task_id}',
+        'stream_url': f'/stream_heatmap_video/{task_id}'
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -75,6 +75,11 @@ const useDetections = (taskID) => {
       } else if (response.data.state === "REVOKED") {
         // Handle revoked tasks
         setProcessingStatus(`Task cancelled by user`);
+        // Clear all data since the task was cancelled
+        setDetections([]);
+        setHeatmapFrames([]);
+        setHeatmapAnalysis({});
+        setHeatmapVideoUrl(null);
         // Stop polling for this task
         return false;
       }
