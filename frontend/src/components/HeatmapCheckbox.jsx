@@ -3,7 +3,7 @@ import React from "react";
 
 const HeatmapCheckbox = ({ useHeatmap, setUseHeatmap }) => {
   return (
-    <div className="mb-4 p-4 border   border-gray-200 rounded-lg bg-gray-50">
+    <div className="mb-4 p-4 border   border-blue-400 rounded-lg bg-blue-100">
       <div className="flex items-center">
         <label className="flex items-center cursor-pointer">
           <input

@@ -12,6 +12,17 @@ import HeatmapVideo from "../components/HeatmapVideo";
 import useVideoProcessing from "../components/useVideoProcessing";
 import useDetections from "../components/UseDetections";
 import { getDistinctColor } from "../components/utils/colorUtils";
+import {
+  Plus,
+  Trash2,
+  X,
+  Film,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  IdCard,
+  Video,
+} from "lucide-react";
 
 const VideoDisplay = () => {
   const [showDialog, setShowDialog] = useState(false);
@@ -56,11 +67,11 @@ const VideoDisplay = () => {
   };
 
   return (
-    <div className="relative bg-gray-50 min-h-screen">
+    <div className="relative bg-gray-500 min-h-screen">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white p-5 shadow-lg border-b border-gray-200">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl px-4 font-bold text-gray-800 ">
+      <div className="sticky top-0 z-10 bg-gray-500 p-5 shadow-lg border-b border-gray-200">
+        <div className="max-w-7xl mx-auto  flex justify-between items-center">
+          <h1 className="text-2xl px-4 font-bold text-white ">
             CCTV Analytics Dashboard
           </h1>
           <div className="flex space-x-3">
@@ -68,36 +79,14 @@ const VideoDisplay = () => {
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors duration-200 shadow-md"
               onClick={() => setShowDialog(true)}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              <Plus className="h-5 w-5 mr-2" />
               New Job
             </button>
             <button
               className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center transition-colors duration-200 shadow-md"
               onClick={handleResetAll}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              <Trash2 className="h-5 w-5 mr-2" />
               Reset All
             </button>
           </div>
@@ -116,20 +105,7 @@ const VideoDisplay = () => {
                 className="text-gray-500 hover:text-gray-700"
                 onClick={() => setShowDialog(false)}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <X className="h-6 w-6" />
               </button>
             </div>
 
@@ -205,20 +181,7 @@ const VideoDisplay = () => {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {jobs.length === 0 ? (
           <div className="flex flex-col items-center justify-center bg-white rounded-xl shadow-md p-10 text-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-16 w-16 text-gray-400 mb-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-              />
-            </svg>
+            <Film className="h-16 w-16 text-gray-400 mb-4" />
             <h3 className="text-xl font-medium text-gray-700 mb-2">
               No Jobs Yet
             </h3>
@@ -230,18 +193,7 @@ const VideoDisplay = () => {
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center transition-colors duration-200"
               onClick={() => setShowDialog(true)}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              <Plus className="h-5 w-5 mr-2" />
               Create New Job
             </button>
           </div>
@@ -313,9 +265,13 @@ const JobProcessing = ({ job, setJobs }) => {
 
   const toggleHeatmapView = () => {
     // Log the current state before toggling
-    console.log(`Toggling heatmap view. Current state: ${job.showHeatmap ? 'Showing heatmap' : 'Showing detections'}`);
+    console.log(
+      `Toggling heatmap view. Current state: ${
+        job.showHeatmap ? "Showing heatmap" : "Showing detections"
+      }`
+    );
     console.log(`Heatmap video URL: ${heatmapVideoUrl}`);
-    
+
     setJobs((prevJobs) =>
       prevJobs.map((j) => {
         if (j.id === job.id) {
@@ -345,7 +301,7 @@ const JobProcessing = ({ job, setJobs }) => {
       // Show notification that heatmap is available
       const notification = document.createElement("div");
       notification.className =
-        "fixed bottom-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg";
+        "fixed bottom-4 right-4 text-green-600 border-green-500 bg-green-100 p-4 rounded-lg shadow-lg";
       notification.textContent =
         'Heatmap analysis is now available! Click "Show Heatmap View" to see it.';
       document.body.appendChild(notification);
@@ -373,18 +329,7 @@ const JobProcessing = ({ job, setJobs }) => {
       {/* Job Header */}
       <div className="bg-gray-800 text-white px-6 py-4 flex justify-between items-center">
         <div className="flex items-center">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5 mr-2"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2h6v4H7V5zm8 8v2h1v-2h-1zm-2-2H7v4h6v-4zm2 0h1V9h-1v2zm1-4V5h-1v2h1zM5 5v2H4V5h1zm0 4H4v2h1V9zm-1 4h1v2H4v-2z"
-              clipRule="evenodd"
-            />
-          </svg>
+          <Video className="h-5 w-5 mr-2" />
           <h3 className="font-semibold text-lg">
             {job.selectedFile ? job.selectedFile.name : "Video Processing Job"}
           </h3>
@@ -406,18 +351,7 @@ const JobProcessing = ({ job, setJobs }) => {
             onClick={handleRemoveJob}
             title="Remove Job"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
+            <X className="h-5 w-5" />
           </button>
         </div>
       </div>
@@ -444,18 +378,7 @@ const JobProcessing = ({ job, setJobs }) => {
           {/* Task ID display */}
           {taskID && (
             <div className="bg-gray-100 px-3 py-1 rounded-lg text-sm text-gray-700 flex items-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 mr-1"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 2a1 1 0 00-1 1v1a1 1 0 002 0V3a1 1 0 00-1-1zM4 4h3a3 3 0 006 0h3a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm2.5 7a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm2.45 4a2.5 2.5 0 10-4.9 0h4.9zM12 9a1 1 0 100 2h3a1 1 0 100-2h-3zm-1 4a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              <IdCard className="h-4 w-4 mr-1" />
               <span className="font-mono">Task ID: {taskID}</span>
             </div>
           )}
@@ -463,26 +386,7 @@ const JobProcessing = ({ job, setJobs }) => {
           {/* Status indicator */}
           {isProcessing && (
             <div className="bg-yellow-100 px-3 py-1 rounded-lg text-sm text-yellow-700 flex items-center">
-              <svg
-                className="animate-spin h-4 w-4 mr-1"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
+              <Loader2 className="animate-spin h-4 w-4 mr-1" />
               Processing...
             </div>
           )}
@@ -503,34 +407,12 @@ const JobProcessing = ({ job, setJobs }) => {
               >
                 {job.showHeatmap ? (
                   <>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 mr-2"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
+                    <ChevronDown className="h-5 w-5 mr-2" />
                     Show Detection View
                   </>
                 ) : (
                   <>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 mr-2"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
+                    <ChevronUp className="h-5 w-5 mr-2" />
                     Show Heatmap View
                   </>
                 )}
@@ -541,41 +423,19 @@ const JobProcessing = ({ job, setJobs }) => {
             <button
               className={`px-4 py-2 rounded-lg transition-colors duration-200 flex items-center ${
                 showAnalysis
-                  ? "bg-green-100 text-green-700"
+                  ? "bg-green-100 text-green-600"
                   : "bg-green-600 text-white"
               }`}
               onClick={() => setShowAnalysis(!showAnalysis)}
             >
               {showAnalysis ? (
                 <>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  <ChevronDown className="h-5 w-5 mr-2" />
                   Hide Heatmap Analysis
                 </>
               ) : (
                 <>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  <ChevronUp className="h-5 w-5 mr-2" />
                   Show Heatmap Analysis
                 </>
               )}
