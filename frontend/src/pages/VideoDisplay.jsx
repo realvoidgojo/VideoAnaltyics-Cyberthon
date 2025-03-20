@@ -312,10 +312,19 @@ const JobProcessing = ({ job, setJobs }) => {
   };
 
   const toggleHeatmapView = () => {
+    // Log the current state before toggling
+    console.log(`Toggling heatmap view. Current state: ${job.showHeatmap ? 'Showing heatmap' : 'Showing detections'}`);
+    console.log(`Heatmap video URL: ${heatmapVideoUrl}`);
+    
     setJobs((prevJobs) =>
-      prevJobs.map((j) =>
-        j.id === job.id ? { ...j, showHeatmap: !j.showHeatmap } : j
-      )
+      prevJobs.map((j) => {
+        if (j.id === job.id) {
+          const newState = !j.showHeatmap;
+          console.log(`Setting job ${j.id} showHeatmap to ${newState}`);
+          return { ...j, showHeatmap: newState };
+        }
+        return j;
+      })
     );
   };
 

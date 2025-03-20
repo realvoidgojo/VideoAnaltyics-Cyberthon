@@ -15,24 +15,27 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-def generate_heatmap_video(video_path, output_path=None):
+def generate_heatmap_video(video_path, output_path=None, task_instance=None):
     """
     Processes a video and generates a heatmap video.
     
     Args:
         video_path: Path to the video file
         output_path: Path to save the output video file (optional)
+        task_instance: Celery task instance for checking cancellation
     
     Returns:
         Path to the generated heatmap video file
+        
+    Raises:
+        Exception: If task is cancelled during processing
     """
     if output_path is None:
-        # Create a temporary file with .avi extension (more compatible)
+        # Create a temporary file with .mp4 extension (more compatible with browsers)
         temp_dir = tempfile.gettempdir()
         output_path = os.path.join(temp_dir, f"heatmap_{os.path.basename(video_path)}")
-        # Force .avi extension
-        if not output_path.endswith('.avi'):
-            output_path = os.path.splitext(output_path)[0] + '.avi'
+        # Force .mp4 extension
+        output_path = os.path.splitext(output_path)[0] + '.mp4'
     
     logger.info(f"Generating heatmap video from {video_path} to {output_path}")
     
@@ -49,21 +52,19 @@ def generate_heatmap_video(video_path, output_path=None):
     height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
     # Create video writer
-    # Use MJPG codec directly as it's the most universally available
-    logger.info("Using MJPG codec for video encoding (most compatible)")
-    fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+    # Try H.264 codec for MP4 (better browser compatibility)
+    logger.info("Using H.264 codec for video encoding (better browser compatibility)")
+    output_path = os.path.splitext(output_path)[0] + '.mp4'
+    logger.info(f"Using MP4 format: {output_path}")
     
-    # Ensure output path has .avi extension for MJPG
-    if not output_path.endswith('.avi'):
-        output_path = os.path.splitext(output_path)[0] + '.avi'
-        logger.info(f"Changed output format to AVI: {output_path}")
-    
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MP4V codec for MP4 files
     video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     
     if not video_writer.isOpened():
-        # Try XVID as a fallback
-        logger.warning("Failed to initialize VideoWriter with MJPG codec. Trying XVID...")
-        fourcc = cv2.VideoWriter_fourcc(*"XVID")
+        # Try MJPG as a fallback
+        logger.warning("Failed to initialize VideoWriter with H.264 codec. Trying MJPG...")
+        output_path = os.path.splitext(output_path)[0] + '.avi'
+        fourcc = cv2.VideoWriter_fourcc(*"MJPG")
         video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
         
         if not video_writer.isOpened():
@@ -72,30 +73,60 @@ def generate_heatmap_video(video_path, output_path=None):
     bar = Bar('Processing Frames for Heatmap Video', max=length)
     first_iteration = True
     
-    for i in range(length):
-        ret, frame = capture.read()
-        if not ret:
-            break
-        if first_iteration:
-            accum_image = np.zeros((height, width), np.uint8)
-            first_iteration = False
-        
-        filter_mask = background_subtractor.apply(frame)
-        _, thresholded = cv2.threshold(filter_mask, 2, 2, cv2.THRESH_BINARY)
-        accum_image = cv2.add(accum_image, thresholded)
-        
-        overlay = cv2.applyColorMap(accum_image, cv2.COLORMAP_HOT)
-        result_overlay = cv2.addWeighted(frame, 0.7, overlay, 0.7, 0)
-        
-        video_writer.write(result_overlay)
-        bar.next()
+    # Check for task cancellation before starting loop
+    if task_instance and hasattr(task_instance, 'request'):
+        if hasattr(task_instance.request, 'id'):
+            from .celery import celery_app
+            task_id = task_instance.request.id
+            task_result = celery_app.AsyncResult(task_id)
+            if task_result.state == 'REVOKED':
+                logger.warning(f"Task {task_id} was cancelled - stopping heatmap video generation")
+                raise Exception("Task cancelled by user")
     
-    bar.finish()
-    capture.release()
-    video_writer.release()
+    try:
+        for i in range(length):
+            # Check for task cancellation every 10 frames
+            if i % 10 == 0 and task_instance and hasattr(task_instance, 'request'):
+                # Check if the task is revoked
+                if hasattr(task_instance.request, 'id'):
+                    from .celery import celery_app
+                    task_id = task_instance.request.id
+                    task_result = celery_app.AsyncResult(task_id)
+                    if task_result.state == 'REVOKED':
+                        logger.warning(f"Task {task_id} was cancelled - stopping heatmap video generation")
+                        # Make sure the exception message matches exactly what the frontend is expecting
+                        raise Exception("Task cancelled by user")
+            ret, frame = capture.read()
+            if not ret:
+                break
+            if first_iteration:
+                accum_image = np.zeros((height, width), np.uint8)
+                first_iteration = False
+            
+            filter_mask = background_subtractor.apply(frame)
+            _, thresholded = cv2.threshold(filter_mask, 2, 2, cv2.THRESH_BINARY)
+            accum_image = cv2.add(accum_image, thresholded)
+            
+            overlay = cv2.applyColorMap(accum_image, cv2.COLORMAP_HOT)
+            result_overlay = cv2.addWeighted(frame, 0.7, overlay, 0.7, 0)
+            
+            video_writer.write(result_overlay)
+            bar.next()
+    except Exception as e:
+        logger.error(f"Error generating heatmap video: {e}")
+        raise
+    finally:
+        bar.finish()
+        capture.release()
+        video_writer.release()
     
     logger.info(f"Heatmap video generated at {output_path}")
     return output_path
+
+# Define a custom exception class for task cancellation
+class TaskCancelledError(Exception):
+    """Custom exception for task cancellation to avoid logging stack traces"""
+    pass
 
 def generate_heatmap_frames(video_path, frame_interval=1, task_instance=None):
     """
@@ -142,11 +173,29 @@ def generate_heatmap_frames(video_path, frame_interval=1, task_instance=None):
                 task_result = celery_app.AsyncResult(task_id)
                 if task_result.state == 'REVOKED':
                     logger.warning(f"Task {task_id} was cancelled - stopping heatmap generation")
-                    break
+                    # Make sure the exception message matches exactly what the frontend is expecting
+                    # Raise our custom exception instead of a generic Exception
+                    capture.release()
+                    bar.finish()
+                    raise TaskCancelledError("Task cancelled by user")
                 
         ret, frame = capture.read()
         if not ret:
             break
+            
+        # Check for task cancellation every 10 frames
+        if frame_count % 10 == 0 and task_instance and hasattr(task_instance, 'request'):
+            if hasattr(task_instance.request, 'id'):
+                from .celery import celery_app
+                task_id = task_instance.request.id
+                task_result = celery_app.AsyncResult(task_id)
+                if task_result.state == 'REVOKED':
+                    logger.warning(f"Task {task_id} was cancelled after {frame_count} frames - stopping heatmap generation")
+                    # Clean up resources
+                    bar.finish()
+                    capture.release()
+                    # Make sure the exception message matches exactly what the frontend is expecting
+                    raise TaskCancelledError("Task cancelled by user")
             
         # Process every frame to update the accumulator
         filter_mask = background_subtractor.apply(frame)
@@ -215,6 +264,17 @@ def generate_heatmap_frames(video_path, frame_interval=1, task_instance=None):
     
     peak_time = 0
     avg_intensity = 0
+    
+    # Check task cancellation one more time before analysis
+    if task_instance and hasattr(task_instance, 'request'):
+        if hasattr(task_instance.request, 'id'):
+            from .celery import celery_app
+            task_id = task_instance.request.id
+            task_result = celery_app.AsyncResult(task_id)
+            if task_result.state == 'REVOKED':
+                logger.warning(f"Task {task_id} was cancelled before analysis - stopping heatmap generation")
+                # Make sure the exception message matches exactly what the frontend is expecting
+                raise TaskCancelledError("Task cancelled by user")
     
     # Calculate peak time safely
     if movement_intensity and len(movement_intensity) > 0:

@@ -77,6 +77,9 @@ const useVideoProcessing = () => {
         
         // Force UI to return to idle state
         alert(`Task ${taskID} was cancelled by user.`);
+        
+        // We don't need to do anything else here since the backend will update the task state
+        // The next time useDetections polls for the task status, it will see the REVOKED state
       } catch (error) {
         console.error("Error sending reset signal:", error);
         alert("Error cancelling task. Please try again.");
