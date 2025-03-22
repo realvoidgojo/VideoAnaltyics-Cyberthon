@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import axios from "axios";
 import VideoUpload from "../components/VideoUpload";
 import ModelSelection from "../components/ModelSelection";
 import ProcessingControls from "../components/ProcessingControls";
@@ -221,6 +222,10 @@ const JobProcessing = ({ job, setJobs }) => {
   } = useVideoProcessing();
 
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [progress, setProgress] = useState(0); // State for progress percentage
+  const [processingStage, setProcessingStage] = useState(""); // Track current processing stage
+  const [estimatedTimeLeft, setEstimatedTimeLeft] = useState(null); // For estimated time remaining
+  const processingStartTime = useRef(null); // To track processing start time
 
   const {
     detections,
@@ -234,6 +239,78 @@ const JobProcessing = ({ job, setJobs }) => {
     heatmapVideoUrl,
   } = useDetections(taskID);
 
+  // Start timer when processing begins
+  useEffect(() => {
+    if (isProcessing && !processingStartTime.current) {
+      processingStartTime.current = new Date();
+    } else if (!isProcessing) {
+      processingStartTime.current = null;
+      setEstimatedTimeLeft(null);
+    }
+  }, [isProcessing]);
+
+  // Poll task status to update progress bar
+  useEffect(() => {
+    if (!taskID || !isProcessing) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await axios.get(`http://localhost:5000/task_status/${taskID}`);
+        const { state, status } = response.data;
+
+        // Extract progress percentage and status message
+        if (status) {
+          // Extract and update progress percentage
+          if (status.percent !== undefined) {
+            setProgress(status.percent);
+          }
+
+          // Extract and update processing stage
+          if (status.status) {
+            setProcessingStage(status.status);
+          }
+
+          // Calculate estimated time remaining
+          if (processingStartTime.current && status.percent > 0) {
+            const elapsedMs = new Date() - processingStartTime.current;
+            const totalEstimatedMs = (elapsedMs * 100) / status.percent;
+            const remainingMs = totalEstimatedMs - elapsedMs;
+            
+            if (remainingMs > 0) {
+              // Convert to readable format: less than a minute or X minutes Y seconds
+              const remainingSec = Math.floor(remainingMs / 1000);
+              if (remainingSec < 60) {
+                setEstimatedTimeLeft(`Less than a minute remaining`);
+              } else {
+                const mins = Math.floor(remainingSec / 60);
+                const secs = remainingSec % 60;
+                setEstimatedTimeLeft(`Approx. ${mins} min ${secs} sec remaining`);
+              }
+            }
+          }
+        }
+
+        // Stop polling when task is complete or failed
+        if (state === "SUCCESS" || state === "FAILURE" || state === "REVOKED") {
+          clearInterval(intervalId);
+          setEstimatedTimeLeft(null);
+          
+          if (state === "SUCCESS") {
+            setProgress(100);
+            setProcessingStage("Processing complete");
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching task status:", error);
+        clearInterval(intervalId);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(intervalId); // Cleanup on unmount
+  }, [taskID, isProcessing]);
+
+  // Other existing useEffect hooks and functions...
+  
   useEffect(() => {
     if (detections && detections.length > 0) {
       const detectedClasses = new Set(
@@ -387,10 +464,42 @@ const JobProcessing = ({ job, setJobs }) => {
           {isProcessing && (
             <div className="bg-yellow-100 px-3 py-1 rounded-lg text-sm text-yellow-700 flex items-center">
               <Loader2 className="animate-spin h-4 w-4 mr-1" />
-              Processing...
+              {processingStage || "Processing..."}
             </div>
           )}
         </div>
+
+        {/* Progress Bar */}
+        {isProcessing && (
+          <div className="mt-4">
+            <div className="w-full bg-gray-200 rounded-full" style={{ height: '20px', overflow: 'hidden' }}>
+              <div
+                className="bg-blue-600 rounded-full flex items-center justify-center transition-all duration-300"
+                style={{ width: `${progress}%`, height: '20px' }}
+              >
+                <span className="text-xs text-white font-medium">
+                  {Math.round(progress)}%
+                </span>
+              </div>
+            </div>
+            <div className="flex justify-between mt-2 text-sm text-gray-600">
+              <div>
+                {job.useHeatmap ? (
+                  processingStage.includes("heatmap") ? 
+                    "Phase 1: Heatmap Analysis" : 
+                    processingStage.includes("Processing frame") ? 
+                      "Phase 2: Object Detection" : 
+                      processingStage
+                ) : (
+                  "Object Detection"
+                )}
+              </div>
+              {estimatedTimeLeft && (
+                <div className="font-medium">{estimatedTimeLeft}</div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Heatmap Control Buttons */}
         {(hasHeatmapData || processingWithHeatmap) && (
