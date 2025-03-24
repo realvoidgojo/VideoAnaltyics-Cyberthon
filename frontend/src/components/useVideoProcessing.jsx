@@ -42,7 +42,7 @@ const useVideoProcessing = () => {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/process_video",
+        "/process_video",  // <-- Changed to relative URL to work with proxy
         formData,
         {
           headers: {
