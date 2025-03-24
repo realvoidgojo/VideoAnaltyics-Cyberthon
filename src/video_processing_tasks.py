@@ -93,83 +93,76 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
                     }
                     
             except heatmap_analysis.TaskCancelledError:
-                logger.warning(f"Task {task_id} was cancelled during heatmap generation")
+                logger.warning("Heatmap generation was cancelled by user")
                 return {
-                    'error': 'Task cancelled by user',
-                    'state': 'REVOKED'
-                }
-            except Exception as e:
-                logger.error(f"Error in heatmap generation: {str(e)}")
-                heatmap_frames = []
-                heatmap_analysis_data = {}
-
-            # Check cancellation again before starting heatmap video generation
-            task_result = celery_app.AsyncResult(task_id)
-            if task_result.state == 'REVOKED':
-                logger.warning(f"Task {task_id} was cancelled before heatmap video generation")
-                self.update_state(state='REVOKED', 
-                               meta={'status': 'Task cancelled by user before heatmap video generation'})
-                # Create proper exception dict for Celery with the required format
-                exception_info = {
                     'exc_type': 'TaskCancellation',
-                    'exc_message': ['Task cancelled by user'],  # Must be a list
+                    'exc_message': ['Task cancelled by user'],
                     'exc_module': 'celery.exceptions',
                     'error': 'Task cancelled by user',
                     'state': 'REVOKED'
                 }
-                return exception_info
-            
-            # Create output filename with .avi extension (more compatible)
-            video_basename = os.path.basename(video_path)
-            video_name = os.path.splitext(video_basename)[0]
-            heatmap_video_path = os.path.join(tempfile.gettempdir(), f"heatmap_{video_name}.avi")
-            
-            # Try to generate the heatmap video
-            heatmap_video = heatmap_analysis.generate_heatmap_video(video_path, heatmap_video_path, self)
-            logger.info(f"Generated heatmap video at: {heatmap_video}")
-            heatmap_video_path = heatmap_video  # Update path to returned value
-
-            # APPROACH #3: TRY TO EXTRACT ANALYSIS DATA
-            try:
-                if heatmap_result and isinstance(heatmap_result, dict):
-                    # Safely extract values with fallbacks
-                    heatmap_analysis_data = {
-                        'peak_movement_time': heatmap_result.get("peak_movement_time", 0),
-                        'average_intensity': heatmap_result.get("average_intensity", 0),
-                        'movement_duration': heatmap_result.get("movement_duration", 0),
-                        'total_duration': heatmap_result.get("total_duration", 0)
-                    }
-                    logger.info(f"Heatmap analysis data extracted: {heatmap_analysis_data}")
-                else:
-                    logger.warning("Could not extract heatmap analysis data: result was not a dictionary or was None")
             except Exception as e:
-                logger.error(f"Error extracting heatmap analysis data: {e}")
+                logger.error(f"Error generating heatmap frames: {e}")
+                heatmap_frames = []
+                heatmap_analysis_data = {}
+                
+            # Generate heatmap video
+            self.update_state(state='PROGRESS', meta={
+                'status': 'Generating heatmap video',
+                'current': 80,
+                'total': 100,
+                'heatmap_frames': heatmap_frames,
+                'heatmap_analysis': heatmap_analysis_data
+            })
             
-            # Always update state to inform frontend about heatmap status
-            self.update_state(state='PROGRESS', 
-                            meta={
-                                'status': 'Heatmap processing completed, continuing with object detection',
-                                'heatmap_analysis': heatmap_analysis_data,
-                                'heatmap_video_path': heatmap_video_path,
-                                'heatmap_frames_count': len(heatmap_frames)
-                            })
+            try:
+                heatmap_video_path = heatmap_analysis.generate_heatmap_video(video_path, task_instance=self)
+                logger.info(f"Heatmap video generated at: {heatmap_video_path}")
+            except heatmap_analysis.TaskCancelledError:
+                logger.warning("Heatmap video generation was cancelled by user")
+                return {
+                    'exc_type': 'TaskCancellation',
+                    'exc_message': ['Task cancelled by user'],
+                    'exc_module': 'celery.exceptions',
+                    'error': 'Task cancelled by user',
+                    'state': 'REVOKED'
+                }
+            except Exception as e:
+                logger.error(f"Error generating heatmap video: {e}")
+                heatmap_video_path = None
+                
+            # Add HLS conversion here, after heatmap_video_path is set
+            if heatmap_video_path:
+                # Also convert to HLS for better browser compatibility
+                self.update_state(state='PROGRESS', meta={
+                    'status': 'Converting heatmap video to HLS format',
+                    'current': 90,
+                    'total': 100,
+                    'heatmap_frames': heatmap_frames,
+                    'heatmap_video_path': heatmap_video_path,
+                    'heatmap_analysis': heatmap_analysis_data
+                })
+                
+                hls_manifest_path = heatmap_analysis.convert_to_hls(heatmap_video_path, task_id=self.request.id)
+                if hls_manifest_path:
+                    logger.info(f"HLS manifest created at: {hls_manifest_path}")
+                else:
+                    logger.warning("Failed to create HLS stream, will use direct MP4 streaming as fallback")
+                
+                # Add HLS path to the result
+                heatmap_analysis_data['hls_manifest_path'] = hls_manifest_path
         
-        # Check cancellation again before starting object detection
-        task_result = celery_app.AsyncResult(self.request.id)
-        if task_result.state == 'REVOKED':
-            logger.warning(f"Task {self.request.id} was cancelled before object detection")
-            self.update_state(state='REVOKED', 
-                           meta={'status': 'Task cancelled by user before object detection'})
-            # Create proper exception dict for Celery
-            exception_info = {
-                'exc_type': 'TaskCancellation',
-                'exc_message': ['Task cancelled by user'],  # Must be a list
-                'exc_module': 'celery.exceptions',
-                'error': 'Task cancelled by user',
-                'state': 'REVOKED'
-            }
-            return exception_info
-            
+        # Extract frames from the video
+        self.update_state(state='PROGRESS', meta={
+            'status': 'Extracting frames',
+            'current': 10,
+            'total': 100,
+            'heatmap_frames': heatmap_frames,
+            'heatmap_video_path': heatmap_video_path,
+            'heatmap_analysis': heatmap_analysis_data
+        })
+        
+        # Continue with the rest of the processing...
         frames = video_processing.extract_frames(video_path, interval=int(frame_interval))
         total_frames = len(frames)
         all_results = []

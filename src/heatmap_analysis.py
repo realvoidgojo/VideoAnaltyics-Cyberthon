@@ -57,12 +57,44 @@ def generate_heatmap_video(video_path, output_path=None, task_instance=None):
     output_path = os.path.splitext(output_path)[0] + '.mp4'
     logger.info(f"Using MP4 format: {output_path}")
     
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MP4V codec for MP4 files
-    video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-    
-    if not video_writer.isOpened():
-        # Try MJPG as a fallback
-        logger.warning("Failed to initialize VideoWriter with H.264 codec. Trying MJPG...")
+    # Try different codec options for H.264 encoding
+    try:
+        # First try 'avc1' - H.264 codec that works in most browsers
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')
+        video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        
+        if not video_writer.isOpened():
+            # If avc1 fails, try 'H264'
+            logger.warning("Failed to initialize VideoWriter with 'avc1' codec. Trying 'H264'...")
+            fourcc = cv2.VideoWriter_fourcc(*'H264')
+            video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            
+        if not video_writer.isOpened():
+            # If H264 fails, try 'X264'
+            logger.warning("Failed to initialize VideoWriter with 'H264' codec. Trying 'X264'...")
+            fourcc = cv2.VideoWriter_fourcc(*'X264')
+            video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            
+        if not video_writer.isOpened():
+            # If all H.264 variants fail, fall back to mp4v
+            logger.warning("Failed to initialize VideoWriter with H.264 codecs. Falling back to mp4v...")
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            
+        if not video_writer.isOpened():
+            # Last resort: try MJPG with AVI container
+            logger.warning("Failed to initialize VideoWriter with mp4v codec. Trying MJPG with AVI container...")
+            output_path = os.path.splitext(output_path)[0] + '.avi'
+            fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+            video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            
+        if not video_writer.isOpened():
+            raise Exception("Failed to initialize VideoWriter with any codec")
+            
+    except Exception as e:
+        logger.error(f"Error initializing video writer: {e}")
+        # Fall back to MJPG with AVI container as last resort
+        logger.warning("Falling back to MJPG with AVI container due to error...")
         output_path = os.path.splitext(output_path)[0] + '.avi'
         fourcc = cv2.VideoWriter_fourcc(*"MJPG")
         video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
@@ -120,7 +152,16 @@ def generate_heatmap_video(video_path, output_path=None, task_instance=None):
         capture.release()
         video_writer.release()
     
-    logger.info(f"Heatmap video generated at {output_path}")
+    # Verify the video was created successfully
+    if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+        logger.info(f"Heatmap video generated successfully at {output_path} ({os.path.getsize(output_path)} bytes)")
+    else:
+        logger.error(f"Failed to generate heatmap video at {output_path}")
+        if os.path.exists(output_path):
+            logger.error(f"File exists but is empty ({os.path.getsize(output_path)} bytes)")
+        else:
+            logger.error("File does not exist")
+    
     return output_path
 
 # Define a custom exception class for task cancellation
@@ -343,3 +384,107 @@ def generate_heatmap_frames(video_path, frame_interval=1, task_instance=None):
     
     logger.info(f"Heatmap analysis generated with {len(heatmap_frames)} frames")
     return analysis
+
+# Add this function after the generate_heatmap_video function
+
+def convert_to_hls(video_path, task_id=None):
+    """
+    Converts a video file to HLS format for better browser compatibility.
+    
+    Args:
+        video_path: Path to the input video file
+        task_id: Optional task ID to use in the output directory name
+        
+    Returns:
+        Path to the HLS manifest file (index.m3u8)
+    """
+    import subprocess
+    import shutil
+    
+    # Check if ffmpeg is available
+    try:
+        ffmpeg_version = subprocess.check_output(['ffmpeg', '-version'], stderr=subprocess.STDOUT)
+        logger.info(f"Using ffmpeg: {ffmpeg_version.decode().splitlines()[0]}")
+    except (subprocess.SubprocessError, FileNotFoundError):
+        logger.error("ffmpeg not found. Cannot convert to HLS format.")
+        return None
+    
+    # Create a unique directory for this HLS stream
+    hls_dir = os.path.join(tempfile.gettempdir(), f"hls_stream_{task_id or os.path.basename(video_path).split('.')[0]}")
+    
+    # Create directory if it doesn't exist
+    if not os.path.exists(hls_dir):
+        os.makedirs(hls_dir)
+    else:
+        # Clean up existing files
+        for file in os.listdir(hls_dir):
+            os.remove(os.path.join(hls_dir, file))
+    
+    # Output manifest path
+    manifest_path = os.path.join(hls_dir, "index.m3u8")
+    
+    # Improved ffmpeg command for better browser compatibility
+    # - Using libx264 codec with baseline profile for maximum compatibility
+    # - Setting keyframe interval to 2 seconds (fps*2)
+    # - Using AAC audio codec
+    # - Creating segments of 2 seconds each
+    # - Using a lower bitrate for better streaming
+    try:
+        # Get video FPS
+        probe_cmd = [
+            'ffprobe', 
+            '-v', 'error', 
+            '-select_streams', 'v:0', 
+            '-show_entries', 'stream=r_frame_rate', 
+            '-of', 'default=noprint_wrappers=1:nokey=1', 
+            video_path
+        ]
+        fps_output = subprocess.check_output(probe_cmd).decode().strip()
+        # Parse frame rate which might be in format "30000/1001"
+        if '/' in fps_output:
+            num, den = map(int, fps_output.split('/'))
+            fps = num / den
+        else:
+            fps = float(fps_output)
+        
+        if fps <= 0:
+            fps = 30.0  # Default to 30 fps if can't determine
+            
+        keyframe_interval = int(fps * 2)  # 2-second keyframe interval
+        
+        # Improved HLS conversion command
+        cmd = [
+            'ffmpeg',
+            '-i', video_path,
+            '-c:v', 'libx264',              # Video codec
+            '-profile:v', 'baseline',       # H.264 profile for maximum compatibility
+            '-level', '3.0',                # H.264 level
+            '-start_number', '0',           # Start segment numbering at 0
+            '-hls_time', '2',               # 2-second segments
+            '-hls_list_size', '0',          # Keep all segments in the playlist
+            '-f', 'hls',                    # HLS format
+            '-g', str(keyframe_interval),   # GOP size (keyframe interval)
+            '-sc_threshold', '0',           # Disable scene change detection
+            '-b:v', '1500k',                # Video bitrate
+            '-maxrate', '1500k',            # Maximum bitrate
+            '-bufsize', '3000k',            # Buffer size
+            '-c:a', 'aac',                  # Audio codec
+            '-b:a', '128k',                 # Audio bitrate
+            '-ac', '2',                     # 2 audio channels (stereo)
+            '-ar', '44100',                 # Audio sample rate
+            '-hls_segment_filename', os.path.join(hls_dir, 'segment_%03d.ts'),
+            manifest_path
+        ]
+        
+        logger.info(f"Running ffmpeg command: {' '.join(cmd)}")
+        subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
+        
+        logger.info(f"HLS conversion successful. Manifest at: {manifest_path}")
+        return manifest_path
+        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error converting to HLS: {e.stderr.decode() if e.stderr else str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error during HLS conversion: {str(e)}")
+        return None
