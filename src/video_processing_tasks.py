@@ -46,6 +46,9 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
                 if task_result and task_result.state == 'REVOKED':
                     logger.warning(f"Task {task_id} was already cancelled before starting")
                     return {
+                        'exc_type': 'TaskCancellation',
+                        'exc_message': ['Task cancelled by user'],
+                        'exc_module': 'celery.exceptions',
                         'error': 'Task cancelled by user',
                         'state': 'REVOKED'
                     }
@@ -110,9 +113,11 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
                 exception_info = {
                     'exc_type': 'TaskCancellation',
                     'exc_message': ['Task cancelled by user'],  # Must be a list
-                    'exc_module': 'celery.exceptions'
+                    'exc_module': 'celery.exceptions',
+                    'error': 'Task cancelled by user',
+                    'state': 'REVOKED'
                 }
-                return {'error': 'Task cancelled by user', **exception_info}
+                return exception_info
             
             # Create output filename with .avi extension (more compatible)
             video_basename = os.path.basename(video_path)
@@ -158,10 +163,12 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
             # Create proper exception dict for Celery
             exception_info = {
                 'exc_type': 'TaskCancellation',
-                'exc_message': 'Task cancelled by user',
-                'exc_module': 'celery.exceptions'
+                'exc_message': ['Task cancelled by user'],  # Must be a list
+                'exc_module': 'celery.exceptions',
+                'error': 'Task cancelled by user',
+                'state': 'REVOKED'
             }
-            return {'error': 'Task cancelled by user', **exception_info}
+            return exception_info
             
         frames = video_processing.extract_frames(video_path, interval=int(frame_interval))
         total_frames = len(frames)
@@ -188,10 +195,8 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
                                      'error': 'Task cancelled by user'
                                  })
                 # Create a properly formatted exception for Celery
-                class TaskCancellationError(Exception):
-                    pass
-                
-                raise TaskCancellationError("Task cancelled by user")
+                # Use the existing TaskCancelledError from heatmap_analysis to ensure consistent handling
+                raise heatmap_analysis.TaskCancelledError("Task cancelled by user")
             
             # Update progress
             progress = int((i / total_frames) * 100) if total_frames > 0 else 0
@@ -252,14 +257,18 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
         return {
             'exc_type': 'TaskCancelled',
             'exc_message': ['Task cancelled by user'],
-            'exc_module': 'celery.exceptions'
+            'exc_module': 'celery.exceptions',
+            'error': 'Task cancelled by user',
+            'state': 'REVOKED'
         }
     except Exception as e:
         logger.error(f"Processing Error: {str(e)}")
         return {
             'exc_type': type(e).__name__,
-            'exc_message': [str(e)],
-            'exc_module': type(e).__module__
+            'exc_message': [str(e)],  # Make sure this is a list
+            'exc_module': type(e).__module__,
+            'error': str(e),
+            'state': 'FAILURE'
         }
 
     finally:
