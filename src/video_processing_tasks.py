@@ -45,13 +45,14 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
                 task_result = celery_app.AsyncResult(task_id)
                 if task_result and task_result.state == 'REVOKED':
                     logger.warning(f"Task {task_id} was already cancelled before starting")
-                    return {
+                    self.update_state(state='REVOKED', meta={
+                        'status': 'Task cancelled by user',
+                        'percent': 0,
                         'exc_type': 'TaskCancellation',
-                        'exc_message': ['Task cancelled by user'],
-                        'exc_module': 'celery.exceptions',
-                        'error': 'Task cancelled by user',
-                        'state': 'REVOKED'
-                    }
+                        'exc_message': 'Task cancelled by user',
+                        'exc_module': 'celery.exceptions'
+                    })
+                    return None
             except Exception as e:
                 logger.error(f"Error checking task state: {e}")
 
@@ -168,27 +169,17 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
         all_results = []
         
         for i, frame in enumerate(frames):
-            # Check for task cancellation using multiple methods
-            # 1. Check state directly from the backend
-            current_state = celery_app.backend.get_state(self.request.id)
-            # 2. Check if task is revoked in the request
-            is_revoked = getattr(self.request, 'is_revoked', lambda: False)()
-            # 3. Manually get the task result to check if it's been marked as revoked
+            # Check for task cancellation
             task_result = celery_app.AsyncResult(self.request.id)
-            
-            if current_state == 'REVOKED' or is_revoked or task_result.state == 'REVOKED':
+            if task_result.state == 'REVOKED':
                 logger.warning(f"Task {self.request.id} was cancelled - stopping processing")
-                # Explicitly update state to show cancellation in UI
-                # Make sure this message appears exactly as 'Task cancelled by user' so the frontend can match it
-                self.update_state(state='REVOKED', 
-                                 meta={
-                                     'current': i, 
-                                     'total': total_frames, 
-                                     'status': 'Task cancelled by user',
-                                     'error': 'Task cancelled by user'
-                                 })
-                # Create a properly formatted exception for Celery
-                # Use the existing TaskCancelledError from heatmap_analysis to ensure consistent handling
+                self.update_state(state='REVOKED', meta={
+                    'status': 'Task cancelled by user',
+                    'percent': progress,
+                    'exc_type': 'TaskCancellation',
+                    'exc_message': 'Task cancelled by user',
+                    'exc_module': 'celery.exceptions'
+                })
                 raise heatmap_analysis.TaskCancelledError("Task cancelled by user")
             
             # Update progress
@@ -247,22 +238,22 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
 
     except heatmap_analysis.TaskCancelledError:
         logger.warning(f"Task {self.request.id} was cancelled")
+        self.update_state(state='REVOKED', meta={
+            'status': 'Task cancelled by user',
+            'percent': 0,
+            'exc_type': 'TaskCancellation',
+            'exc_message': 'Task cancelled by user',
+            'exc_module': 'celery.exceptions'
+        })
         return {
-            'exc_type': 'TaskCancelled',
-            'exc_message': ['Task cancelled by user'],
-            'exc_module': 'celery.exceptions',
-            'error': 'Task cancelled by user',
-            'state': 'REVOKED'
+            'exc_type': 'TaskCancellation',
+            'exc_message': 'Task cancelled by user',
+            'exc_module': 'celery.exceptions'
         }
+
     except Exception as e:
         logger.error(f"Processing Error: {str(e)}")
-        return {
-            'exc_type': type(e).__name__,
-            'exc_message': [str(e)],  # Make sure this is a list
-            'exc_module': type(e).__module__,
-            'error': str(e),
-            'state': 'FAILURE'
-        }
+        raise e
 
     finally:
         if os.path.exists(video_path):
