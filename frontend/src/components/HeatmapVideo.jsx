@@ -150,44 +150,59 @@ const HeatmapVideo = ({ taskID, containerWidth, visible }) => {
     }
   };
 
+  const openInExternalPlayer = () => {
+    if (videoInfo) {
+      window.open(videoInfo.stream_url, "_blank");
+    }
+  };
+
   if (!visible) return null;
 
   return (
-    <div
-      className="video-container relative"
-      style={{ width: containerWidth || "100%" }}
-    >
-      {isLoading && (
-        <div className="absolute inset-0 flex justify-center items-center bg-gray-100 rounded-lg">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
-          <span className="ml-3 text-gray-700">Loading heatmap video...</span>
-        </div>
-      )}
+    <div className="video-container relative space-y-4">
+      <div style={{ width: containerWidth || "100%" }}>
+        {isLoading && (
+          <div className="absolute inset-0 flex justify-center items-center bg-gray-100 rounded-lg">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
+            <span className="ml-3 text-gray-700">Loading heatmap video...</span>
+          </div>
+        )}
 
-      {videoError && (
-        <div className="p-4 bg-red-100 text-red-700 rounded-lg">
-          <h3 className="font-bold">Error Loading Heatmap Video</h3>
-          <p>{errorDetails}</p>
-          {videoInfo && (
-            <div className="mt-2">
-              <a
-                href={videoInfo.stream_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
-              >
-                Open in external player
-              </a>
-            </div>
-          )}
+        {videoError && (
+          <div className="p-4 bg-red-100 text-red-700 rounded-lg">
+            <h3 className="font-bold">Error Loading Heatmap Video</h3>
+            <p>{errorDetails}</p>
+          </div>
+        )}
+
+        <div data-vjs-player className="w-full">
+          <video
+            ref={videoRef}
+            className="video-js vjs-big-play-centered vjs-default-skin"
+            playsInline
+          />
         </div>
-      )}
-      <div data-vjs-player className="w-full">
-        <video
-          ref={videoRef}
-          className="video-js vjs-big-play-centered vjs-default-skin"
-          playsInline
-        />
+
+        {/* External Player Button - Always visible when video info is available */}
+        {videoInfo && (
+          <div className="mt-4 flex justify-start">
+            <button
+              onClick={openInExternalPlayer}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+              </svg>
+              Open in External Player
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
