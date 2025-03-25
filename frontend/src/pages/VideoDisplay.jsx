@@ -255,17 +255,17 @@ const JobProcessing = ({ job, setJobs }) => {
 
     const intervalId = setInterval(async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/task_status/${taskID}`);
+        const response = await axios.get(
+          `http://localhost:5000/task_status/${taskID}`
+        );
         const { state, status } = response.data;
 
         // Extract progress percentage and status message
         if (status) {
-          // Extract and update progress percentage
           if (status.percent !== undefined) {
             setProgress(status.percent);
           }
 
-          // Extract and update processing stage
           if (status.status) {
             setProcessingStage(status.status);
           }
@@ -275,42 +275,53 @@ const JobProcessing = ({ job, setJobs }) => {
             const elapsedMs = new Date() - processingStartTime.current;
             const totalEstimatedMs = (elapsedMs * 100) / status.percent;
             const remainingMs = totalEstimatedMs - elapsedMs;
-            
+
             if (remainingMs > 0) {
-              // Convert to readable format: less than a minute or X minutes Y seconds
               const remainingSec = Math.floor(remainingMs / 1000);
               if (remainingSec < 60) {
                 setEstimatedTimeLeft(`Less than a minute remaining`);
               } else {
                 const mins = Math.floor(remainingSec / 60);
                 const secs = remainingSec % 60;
-                setEstimatedTimeLeft(`Approx. ${mins} min ${secs} sec remaining`);
+                setEstimatedTimeLeft(
+                  `Approx. ${mins} min ${secs} sec remaining`
+                );
               }
             }
           }
         }
 
-        // Stop polling when task is complete or failed
-        if (state === "SUCCESS" || state === "FAILURE" || state === "REVOKED") {
+        // Handle task completion states
+        if (state === "REVOKED") {
           clearInterval(intervalId);
           setEstimatedTimeLeft(null);
-          
+          setProcessingStage("Task cancelled by user");
+          // Keep isProcessing true until user acknowledges
+          setTimeout(() => {
+            setIsProcessing(false);
+          }, 2000); // Show the cancelled message for 2 seconds
+        } else if (state === "SUCCESS" || state === "FAILURE") {
+          clearInterval(intervalId);
+          setEstimatedTimeLeft(null);
+
           if (state === "SUCCESS") {
             setProgress(100);
             setProcessingStage("Processing complete");
+          } else {
+            setProcessingStage("Processing failed");
           }
         }
       } catch (error) {
         console.error("Error fetching task status:", error);
         clearInterval(intervalId);
       }
-    }, 2000); // Poll every 2 seconds
+    }, 2000);
 
-    return () => clearInterval(intervalId); // Cleanup on unmount
+    return () => clearInterval(intervalId);
   }, [taskID, isProcessing]);
 
   // Other existing useEffect hooks and functions...
-  
+
   useEffect(() => {
     if (detections && detections.length > 0) {
       const detectedClasses = new Set(
@@ -472,10 +483,13 @@ const JobProcessing = ({ job, setJobs }) => {
         {/* Progress Bar */}
         {isProcessing && (
           <div className="mt-4">
-            <div className="w-full bg-gray-200 rounded-full" style={{ height: '20px', overflow: 'hidden' }}>
+            <div
+              className="w-full bg-gray-200 rounded-full"
+              style={{ height: "20px", overflow: "hidden" }}
+            >
               <div
                 className="bg-blue-600 rounded-full flex items-center justify-center transition-all duration-300"
-                style={{ width: `${progress}%`, height: '20px' }}
+                style={{ width: `${progress}%`, height: "20px" }}
               >
                 <span className="text-xs text-white font-medium">
                   {Math.round(progress)}%
@@ -484,15 +498,13 @@ const JobProcessing = ({ job, setJobs }) => {
             </div>
             <div className="flex justify-between mt-2 text-sm text-gray-600">
               <div>
-                {job.useHeatmap ? (
-                  processingStage.includes("heatmap") ? 
-                    "Phase 1: Heatmap Analysis" : 
-                    processingStage.includes("Processing frame") ? 
-                      "Phase 2: Object Detection" : 
-                      processingStage
-                ) : (
-                  "Object Detection"
-                )}
+                {job.useHeatmap
+                  ? processingStage.includes("heatmap")
+                    ? "Phase 1: Heatmap Analysis"
+                    : processingStage.includes("Processing frame")
+                    ? "Phase 2: Object Detection"
+                    : processingStage
+                  : "Object Detection"}
               </div>
               {estimatedTimeLeft && (
                 <div className="font-medium">{estimatedTimeLeft}</div>
