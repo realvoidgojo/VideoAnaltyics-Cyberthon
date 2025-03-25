@@ -1,0 +1,138 @@
+react-dom_client.js?v=8e7473f0:17804 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+react-dom_client.js?v=8e7473f0:2306 Received NaN for the `value` attribute. If this is expected, cast the value to a string.
+validateProperty @ react-dom_client.js?v=8e7473f0:2306
+react-dom_client.js?v=8e7473f0:1458 The specified value "NaN" cannot be parsed, or is out of range.
+set @ react-dom_client.js?v=8e7473f0:1458
+react-dom_client.js?v=8e7473f0:1458 The specified value "NaN" cannot be parsed, or is out of range.
+set @ react-dom_client.js?v=8e7473f0:1458
+react-dom_client.js?v=8e7473f0:1458 The specified value "NaN" cannot be parsed, or is out of range.
+set @ react-dom_client.js?v=8e7473f0:1458
+react-dom_client.js?v=8e7473f0:1458 The specified value "NaN" cannot be parsed, or is out of range.
+set @ react-dom_client.js?v=8e7473f0:1458
+useVideoProcessing.jsx:54 Task ID: 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+useVideoProcessing.jsx:55 Heatmap enabled: true
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+VideoDisplay.jsx:345 Toggling heatmap view. Current state: Showing detections
+VideoDisplay.jsx:350 Heatmap video URL: http://localhost:5000/stream_heatmap_video/31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+VideoDisplay.jsx:356 Setting job 1742903498579 showHeatmap to true
+VideoDisplay.jsx:356 Setting job 1742903498579 showHeatmap to true
+HeatmapVideo.jsx:29 Video info: Object
+HeatmapVideo.jsx:29 Video info: Object
+HeatmapVideo.jsx:69 Initializing video.js player with options: Object
+HeatmapVideo.jsx:69 Initializing video.js player with options: Object
+chunk-ERFS5OCM.js?v=8e7473f0:10813 VIDEOJS: WARN: The element supplied is not included in the DOM
+(anonymous) @ chunk-ERFS5OCM.js?v=8e7473f0:10813
+HeatmapVideo.jsx:106 Player is ready
+HeatmapVideo.jsx:128 Video loadstart event fired
+HeatmapVideo.jsx:129 Video loadedmetadata event fired
+HeatmapVideo.jsx:130 Video loadeddata event fired
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+UseDetections.jsx:23 Task Status: Object
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: Object
+UseDetections.jsx:23 Task Status: {results: {…}, state: 'SUCCESS', status: {…}}
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: {average_intensity: 0.6068680190925173, hls_manifest_path: '/tmp/hls_stream_31e6f5da-6c78-40e8-9c0a-4fafd28f4907/index.m3u8', movement_duration: 0, peak_movement_time: 8.708699469512196, total_duration: 10.944265999999999}
+UseDetections.jsx:23 Task Status: {results: {…}, state: 'SUCCESS', status: {…}}
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: {average_intensity: 0.6068680190925173, hls_manifest_path: '/tmp/hls_stream_31e6f5da-6c78-40e8-9c0a-4fafd28f4907/index.m3u8', movement_duration: 0, peak_movement_time: 8.708699469512196, total_duration: 10.944265999999999}
+UseDetections.jsx:23 Task Status: {results: {…}, state: 'SUCCESS', status: {…}}
+UseDetections.jsx:34 Heatmap was requested for this task
+UseDetections.jsx:40 Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+UseDetections.jsx:45 Received 11 heatmap frames
+UseDetections.jsx:53 Setting heatmap analysis data: {average_intensity: 0.6068680190925173, hls_manifest_path: '/tmp/hls_stream_31e6f5da-6c78-40e8-9c0a-4fafd28f4907/index.m3u8', movement_duration: 0, peak_movement_time: 8.708699469512196, total_duration: 10.944265999999999}
+ Task Status: {results: {…}, state: 'SUCCESS', status: {…}}
+ Heatmap was requested for this task
+ Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+ Received 11 heatmap frames
+ Setting heatmap analysis data: {average_intensity: 0.6068680190925173, hls_manifest_path: '/tmp/hls_stream_31e6f5da-6c78-40e8-9c0a-4fafd28f4907/index.m3u8', movement_duration: 0, peak_movement_time: 8.708699469512196, total_duration: 10.944265999999999}
+ Task Status: {results: {…}, state: 'SUCCESS', status: {…}}
+ Heatmap was requested for this task
+ Set heatmap video URL for task 31e6f5da-6c78-40e8-9c0a-4fafd28f4907
+ Received 11 heatmap frames
+ Setting heatmap analysis data: {average_intensity: 0.6068680190925173, hls_manifest_path: '/tmp/hls_stream_31e6f5da-6c78-40e8-9c0a-4fafd28f4907/index.m3u8', movement_duration: 0, peak_movement_time: 8.708699469512196, total_duration: 10.944265999999999}
