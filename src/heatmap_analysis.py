@@ -453,28 +453,44 @@ def convert_to_hls(video_path, task_id=None):
         keyframe_interval = int(fps * 2)  # 2-second keyframe interval
         
         # Improved HLS conversion command
+        # cmd = [
+        #     'ffmpeg',
+        #     '-i', video_path,
+        #     '-c:v', 'libx264',              # Video codec
+        #     '-profile:v', 'baseline',       # H.264 profile for maximum compatibility
+        #     '-level', '3.0',                # H.264 level
+        #     '-start_number', '0',           # Start segment numbering at 0
+        #     '-hls_time', '2',               # 2-second segments
+        #     '-hls_list_size', '0',          # Keep all segments in the playlist
+        #     '-f', 'hls',                    # HLS format
+        #     '-g', str(keyframe_interval),   # GOP size (keyframe interval)
+        #     '-sc_threshold', '0',           # Disable scene change detection
+        #     '-b:v', '1500k',                # Video bitrate
+        #     '-maxrate', '1500k',            # Maximum bitrate
+        #     '-bufsize', '3000k',            # Buffer size
+        #     '-c:a', 'aac',                  # Audio codec
+        #     '-b:a', '128k',                 # Audio bitrate
+        #     '-ac', '2',                     # 2 audio channels (stereo)
+        #     '-ar', '44100',                 # Audio sample rate
+        #     '-hls_segment_filename', os.path.join(hls_dir, 'segment_%03d.ts'),
+        #     manifest_path
+        # ]
+
         cmd = [
-            'ffmpeg',
-            '-i', video_path,
-            '-c:v', 'libx264',              # Video codec
-            '-profile:v', 'baseline',       # H.264 profile for maximum compatibility
-            '-level', '3.0',                # H.264 level
-            '-start_number', '0',           # Start segment numbering at 0
-            '-hls_time', '2',               # 2-second segments
-            '-hls_list_size', '0',          # Keep all segments in the playlist
-            '-f', 'hls',                    # HLS format
-            '-g', str(keyframe_interval),   # GOP size (keyframe interval)
-            '-sc_threshold', '0',           # Disable scene change detection
-            '-b:v', '1500k',                # Video bitrate
-            '-maxrate', '1500k',            # Maximum bitrate
-            '-bufsize', '3000k',            # Buffer size
-            '-c:a', 'aac',                  # Audio codec
-            '-b:a', '128k',                 # Audio bitrate
-            '-ac', '2',                     # 2 audio channels (stereo)
-            '-ar', '44100',                 # Audio sample rate
-            '-hls_segment_filename', os.path.join(hls_dir, 'segment_%03d.ts'),
-            manifest_path
+          'ffmpeg',
+         '-i', video_path,
+          '-c:v', 'libx264',        # Video codec
+          '-preset', 'fast',        # Preset for encoding speed vs compression ratio
+          '-crf', '23',             # Constant Rate Factor (lower is better quality)
+         '-sc_threshold', '0',     # Disable scene change detection
+           '-g', '60',               # GOP size (keyframe interval)
+          '-hls_time', '4',         # 4-second segments
+          '-hls_list_size', '0',    # Keep all segments in the playlist
+          '-f', 'hls',              # HLS format
+          '-hls_segment_filename', os.path.join(hls_dir, 'segment_%03d.ts'),
+          os.path.join(hls_dir, 'index.m3u8')  # Output HLS manifest
         ]
+
         
         logger.info(f"Running ffmpeg command: {' '.join(cmd)}")
         subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
