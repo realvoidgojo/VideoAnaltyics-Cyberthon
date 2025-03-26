@@ -26,7 +26,7 @@ const ObjectFrequencyChart = ({ detections, useTrackIds = false }) => {
     datasets: [],
   });
 
-  useEffect(() => {
+  useEffect(() => { 
     if (!detections || detections.length === 0) return;
 
     // Count frequency of each object class

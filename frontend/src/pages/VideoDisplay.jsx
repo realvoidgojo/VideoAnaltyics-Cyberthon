@@ -256,8 +256,22 @@ const JobProcessing = ({ job, setJobs }) => {
   useEffect(() => {
     if (!taskID || !isProcessing) return;
 
-    const intervalId = setInterval(async () => {
+    let intervalId;
+    let pollCount = 0;
+    let pollInterval = 2000; // Start with 2 seconds
+    const maxPolls = 300; // Maximum number of polls (10 minutes at 2-second intervals)
+    
+    const pollTaskStatus = async () => {
       try {
+        pollCount++;
+        
+        // If we've reached the maximum number of polls, stop polling
+        if (pollCount > maxPolls) {
+          console.log(`Reached maximum number of polls (${maxPolls}). Stopping.`);
+          clearInterval(intervalId);
+          return;
+        }
+        
         const response = await axios.get(
           `http://localhost:5000/task_status/${taskID}`
         );
@@ -316,11 +330,29 @@ const JobProcessing = ({ job, setJobs }) => {
         }
       } catch (error) {
         console.error("Error fetching task status:", error);
+        // Increase polling interval on error (exponential backoff)
+        pollInterval = Math.min(pollInterval * 1.5, 10000); // Max 10 seconds
+        
+        // If we've had too many errors, stop polling
+        if (pollCount > 10) {
+          clearInterval(intervalId);
+        }
+      }
+    };
+
+    // Initial poll
+    pollTaskStatus();
+    
+    // Set up interval with dynamic polling rate
+    intervalId = setInterval(pollTaskStatus, pollInterval);
+
+    // Cleanup function to clear interval when component unmounts or dependencies change
+    return () => {
+      if (intervalId) {
+        console.log("Cleaning up task status polling interval");
         clearInterval(intervalId);
       }
-    }, 2000);
-
-    return () => clearInterval(intervalId);
+    };
   }, [taskID, isProcessing]);
 
   // Other existing useEffect hooks and functions...
