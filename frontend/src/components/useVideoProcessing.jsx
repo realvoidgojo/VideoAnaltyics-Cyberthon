@@ -42,7 +42,7 @@ const useVideoProcessing = () => {
 
     try {
       const response = await axios.post(
-        "/process_video",  // <-- Changed to relative URL to work with proxy
+        "/process_video", // <-- Changed to relative URL to work with proxy
         formData,
         {
           headers: {
@@ -53,14 +53,14 @@ const useVideoProcessing = () => {
       setTaskID(response.data.task_id);
       console.log("Task ID:", response.data.task_id);
       console.log("Heatmap enabled:", useHeatmapValue);
-      
+
       // Show notification without affecting the isProcessing state
       showNotification(
         "Processing started in background with task ID: " +
           response.data.task_id +
           (useHeatmapValue ? " (with heatmap analysis)" : "")
       );
-      
+
       // IMPORTANT: Don't set isProcessing to false here!
       // The progress bar should remain visible and update as processing continues
     } catch (error) {
@@ -72,43 +72,19 @@ const useVideoProcessing = () => {
   };
 
   const handleReset = async () => {
-    // Send signal to backend to stop the current task and reset processing
     if (taskID) {
       try {
-        // Set processing to true to indicate operation in progress
-        setIsProcessing(true);
-        
-        const response = await axios.post(
-          "http://localhost:5000/reset_processing",
-          {
-            task_id: taskID,
-          },
-          {
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        
-        console.log(`Processing reset signal sent to the backend for task ${taskID}.`);
-        console.log(`Response:`, response.data);
-        
-        // Force UI to return to idle state
-        alert(`Task ${taskID} was cancelled by user.`);
-        
-        // We don't need to do anything else here since the backend will update the task state
-        // The next time useDetections polls for the task status, it will see the REVOKED state
+        await axios.post("http://localhost:5000/reset_processing", {
+          task_id: taskID,
+        });
+        // Don't reset state here - wait for the task status polling to detect REVOKED state
+        console.log(`Reset signal sent for task ${taskID}`);
       } catch (error) {
         console.error("Error sending reset signal:", error);
         alert("Error cancelling task. Please try again.");
-      } finally {
-        // Always reset the state
-        setTaskID(null);
-        setIsProcessing(false);
-        setIsVideoPaused(false);
       }
     } else {
-      // Even if no task is running, reset the UI state
+      // If no task is running, just reset the UI state
       setTaskID(null);
       setIsProcessing(false);
       setIsVideoPaused(false);
