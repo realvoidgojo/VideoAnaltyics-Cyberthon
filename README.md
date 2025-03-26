@@ -1,208 +1,199 @@
-# Video Analytics and Object Detection Project
+# Video Analytics and OSINT Project
 
-This project demonstrates real-time object detection in videos using a React frontend and a Flask backend. It utilizes the YOLO model for object detection, Celery for asynchronous task management, and Redis for message brokering.
+This project demonstrates real-time object detection in videos using a React frontend and a Flask backend. It utilizes the YOLO model for object detection, Celery for asynchronous task management, and Redis for message brokering. The application includes features for video analysis, heatmap generation, and object tracking.
+
+## Features
+
+- **Real-time Object Detection**: Process videos and detect objects using YOLO models
+- **Heatmap Analysis**: Generate motion heatmaps to visualize movement patterns
+- **Object Tracking**: Track objects across video frames
+- **Statistical Analysis**: View frequency charts and statistics about detected objects
+- **Multiple Video Processing**: Process multiple videos simultaneously with job management
+- **Customizable Detection Parameters**: Adjust frame intervals and model selection
 
 ## Prerequisites
 
 Before you begin, ensure that you have the following installed:
 
-- **Python 3.10**
+- **Python 3.12**
 - **Node.js and npm**
 - **Git** (for cloning the repository)
 - **Redis** (for Celery message broker and result backend)
-
+  - **Windows:** [Download Redis for Windows](https://github.com/tporadowski/redis/releases)
   - **Ubuntu:** `sudo apt update && sudo apt install redis-server`
-  - **windows:** [`download`](https://github.com/tporadowski/redis/releases)
 
-  _For Nvidia GPU (Optional - but highly recommended for performance)_
+### GPU Acceleration (Optional but Recommended)
 
-  - **CUDA Toolkit:** Version 11.6 or higher (check compatibility with PyTorch)
-  - **cuDNN:** Version matching your CUDA Toolkit
-  - **PyTorch with CUDA support:**
+- **CUDA Toolkit:** Version 11.6 or higher (check compatibility with PyTorch)
+- **cuDNN:** Version matching your CUDA Toolkit
+- **PyTorch with CUDA support**
 
 ## Installation
 
-1.  **Clone the repository:** install lfs extension for git [download](https://git-lfs.com/)
+1. **Clone the repository:**
+   
+   First, install Git LFS extension for handling large files: [Download Git LFS](https://git-lfs.com/)
 
-    ```
-    git clone https://github.com/realvoidgojo/VideoAnaltyics-Cyberthon.git
-    cd VideoAnaltyics-Cyberthon
-    ```
+   ```bash
+   git clone https://github.com/realvoidgojo/VideoAnaltyics-Cyberthon.git
+   cd VideoAnaltyics-Cyberthon
+   ```
 
-2.  **Backend Setup (Flask & Celery):**
+2. **Backend Setup (Flask & Celery):**
 
-    - Create a virtual environment (recommended):
+   - Create a virtual environment:
 
-      ```
-      python -m venv venv
-      source venv/bin/activate  # Linux or macOS
-      # OR
-      venv\Scripts\activate  # Windows
-      ```
+     ```bash
+     python -m venv venv
+     venv\Scripts\activate  # Windows
+     # OR
+     source venv/bin/activate  # Linux or macOS
+     ```
 
-    - Install the required Python packages:
+   - Install the required Python packages:
 
-      ```
-      pip install -r requirements.txt
-      ```
+     ```bash
+     pip install -r requirements.txt
+     ```
 
-      _If you want CUDA, follow this instructions (check CUDA compatibility)_
+   - For CUDA support (optional):
 
-      ```
-      pip uninstall torch torchvision
-      pip install torch torchvision  --index-url https://download.pytorch.org/whl/cu116 #replace cu116 with CUDA version
-      ```
+     ```bash
+     pip uninstall torch torchvision
+     pip install torch torchvision --index-url https://download.pytorch.org/whl/cu116  # Replace cu116 with your CUDA version
+     ```
 
-    - **Create `requirements.txt`** It is strongly recommended to regenerate this file after installation to keep it up to date.
+   - Download YOLO Models:
+     Download a YOLO model (e.g., `yolov11n.pt`) from the [official YOLO repository](https://github.com/ultralytics/ultralytics) or the [Ultralytics website](https://ultralytics.com/) and place it in the `models` directory.
 
-      ```
-      pip freeze > requirements.txt
-      ```
+   - Set up the data directory:
+     Create an empty directory named `data` in your project root. This is where uploaded videos will be temporarily stored.
 
-    - **Download YOLO Models:**
-      Download a YOLO model (e.g., `yolov11n.pt`) from the [official YOLO repository](https://github.com/ultralytics/ultralytics) or the [Ultralytics website](https://ultralytics.com/) and place it in the `models` directory.
-    - **Set up the `data` directory:** Create an empty directory named `data` in your backend directory. This is where uploaded videos will be temporarily stored.
+3. **Frontend Setup (React + Vite):**
 
-3.  **Frontend Setup (React + Vite):**
+   - Navigate to the frontend directory:
 
-    - Navigate to the frontend directory:
+     ```bash
+     cd frontend
+     ```
 
-      ```
-      cd frontend
-      ```
+   - Install the required Node.js packages:
 
-    - Install the required Node.js packages:
-
-      ```
-      npm install
-      ```
-
-## Configuration
-
-- **Backend (Flask & Celery):**
-
-  - Ensure that the paths to the YOLO models in your `object_detection.py` file are correct, relative to the location of your `app.py` file. The default path is `./models/yolov8n.pt`. Ensure that the models are not corrupted, or please download from Ultralytics and replace them with their respective paths and names.
-  - Configure Redis connection settings in `src/celeryconfig.py` if necessary.
-  - If running on CPU, make sure `device = "cpu"` in `object_detection.py`.
-  - If running on GPU, make sure `device = "cuda"` in `object_detection.py` and CUDA is properly configured. You can verify CUDA installation by running `nvidia-smi`.
-
-- **Frontend (React):**
-
-  - In `VideoDisplay.jsx`, verify that the Axios POST URL (`http://localhost:5000/process_video`) matches the address where your Flask backend will be running.
+     ```bash
+     npm install
+     ```
 
 ## Running the Application
 
-1.  **Start Redis:**
+1. **Start Redis:**
 
-    - Ensure Redis server is running.
+   - Ensure Redis server is running.
+   - For Windows, start the Redis server from the installation directory.
 
-2.  **Start the Celery worker:**
+2. **Start the Celery worker:**
 
-    - From the project's root directory, run:
+   - From the project's root directory, run:
 
-      ```
-      celery -A src.celery.celery_app worker --loglevel=info --pool=threads -c 4
-      ```
+     ```bash
+     celery -A src.celery.celery_app worker --loglevel=info --pool=threads -c 4
+     ```
 
-      - Adjust the `-c` option (concurrency) to match the number of CPU cores you want to use. You can try other values like `-c 8` depending on your hardware.
-      - If you get CUDA errors, it means CUDA it's not installed properly.
+   - Adjust the `-c` option (concurrency) to match the number of CPU cores you want to use.
 
-3.  **Start the Flask backend:**
+3. **Start the Flask backend:**
 
-    - From the project's root directory, run:
+   - From the project's root directory, run:
 
-      ```
-      python app.py
-      ```
+     ```bash
+     python app.py
+     ```
 
-      - Note the address the Flask app is running on (e.g., `http://127.0.0.1:5000`).
+   - The Flask app will run on `http://127.0.0.1:5000` by default.
 
-4.  **Start the React frontend:**
+4. **Start the React frontend:**
 
-    - From the frontend directory, run:
+   - From the frontend directory, run:
 
-      ```
-      npm run dev
-      ```
+     ```bash
+     npm run dev
+     ```
 
-    - The React app should open in your browser (usually at `http://localhost:3000`).
+   - The React app will open in your browser (usually at `http://localhost:5173`).
 
-## Usage
+## Performance Optimization
 
-1.  **Upload Video:** In the React app, use the "Choose File" button to upload a video file.
-2.  **Select YOLO Model:** Use the dropdown menu to select the desired YOLO model for object detection.
-3.  **Set Frame Interval:** Enter the desired frame interval to skip frames for faster processing (e.g., 1 for every frame, 30 for every 30th frame).
-4.  **Start Processing:** Click the "Start Processing" button. The backend will process the video in the background using Celery, and the object detections will be displayed on the video.
-5.  **Monitor Task Status:** The UI will display the task ID and the processing status.
-6.  **View Detections:** Once processing is complete, the video will play, and the object detection bounding boxes will be displayed on top of the video.
+This application has been optimized to handle large video files efficiently:
+
+- **Memory Management**: Automatic cleanup of unused resources to prevent browser crashes
+- **Request Throttling**: Intelligent polling with cooldown periods to reduce network traffic
+- **Caching**: Detection results are cached to prevent redundant fetches
+- **Exponential Backoff**: Polling frequency is reduced for completed tasks
 
 ## Project Structure
 
 ```
-video-object-detection-project/
+VideoAnalytics-OSINT/
 ├── app.py                   # Main Flask application file
 ├── src/                     # Source code directory
-│   ├── celery.py              # Celery application definition
-│   ├── celeryconfig.py        # Celery configuration file
+│   ├── celery.py            # Celery application definition
+│   ├── celeryconfig.py      # Celery configuration file
 │   ├── video_processing.py  # Frame extraction and preprocessing functions
 │   ├── video_processing_tasks.py  # Celery tasks for video processing
-│   ├── object_detection.py    # YOLO object detection functions
+│   ├── object_detection.py  # YOLO object detection functions
+│   ├── heatmap_analysis.py  # Heatmap generation and analysis
 ├── models/                  # Directory for YOLO model (.pt file)
 ├── data/                    # Directory for temporarily storing uploaded videos
-├── venv/                    # Python virtual environment
+├── hls_stream/              # Directory for HLS video streaming
 ├── frontend/                # React frontend
 │   ├── src/                 # React source code
 │   │   ├── components/      # React components
-│   │   │   └── VideoDisplay.jsx  # Main component for video display and object detection
-│   ├── public/                # Static assets
-│   ├── vite.config.js         # Vite configuration
-│   ├── .env.example           # Example environment variables
-│   ├── package.json           # Node.js dependencies
-│   └── ...
+│   │   │   ├── UseDetections.jsx  # Hook for fetching and managing detection data
+│   │   │   ├── VideoCanvas.jsx    # Component for displaying video with detections
+│   │   │   ├── HeatmapVideo.jsx   # Component for displaying heatmap video
+│   │   │   └── ...
+│   │   ├── pages/           # Page components
+│   │   │   └── VideoDisplay.jsx  # Main page for video display and analysis
+│   ├── public/              # Static assets
+│   ├── vite.config.js       # Vite configuration
+│   └── package.json         # Node.js dependencies
 ├── requirements.txt         # Python dependencies
-├── README.md                  # This file
-└── ...
+└── README.md                # This file
 ```
 
 ## Troubleshooting
 
-- **CORS Errors:**
+- **Browser Crashes (SIGILL Error)**:
+  - If you experience browser crashes, it may be due to excessive network requests or memory usage.
+  - The application has been optimized to reduce these issues, but for very large videos, consider:
+    - Reducing the frame interval to process fewer frames
+    - Using a smaller model (e.g., yolov11n instead of yolov11l)
+    - Closing other browser tabs to free up memory
 
-  - If you encounter Cross-Origin Resource Sharing (CORS) errors in your browser's console, ensure that you have correctly enabled CORS in your Flask app using the `flask_cors` library.
+- **CORS Errors**:
+  - If you encounter Cross-Origin Resource Sharing (CORS) errors, ensure that you have correctly enabled CORS in your Flask app.
 
-- **Model Not Found Errors:**
-
+- **Model Not Found Errors**:
   - If the YOLO model cannot be found, double-check that the path to the model file in `object_detection.py` is correct and that the model file exists in the specified location.
 
-- **Video Not Playing:**
-
+- **Video Not Playing**:
   - If the video is not playing in the React app, make sure that the video file is a supported format and that the `videoSource` state variable is correctly set.
-
-- **Celery Task Errors:**
-
-  - Check the Celery worker logs for any errors during task execution. Common issues include missing dependencies, incorrect file paths, or CUDA initialization problems.
-
-- **CUDA Errors:**
-
-  - If you are using CUDA, ensure that your CUDA toolkit, cuDNN, and PyTorch versions are compatible. Also, verify that your NVIDIA drivers are up to date. Use `nvidia-smi` to check if CUDA is correctly recognized.
-
-- **"Cannot re-initialize CUDA in forked subprocess" Error:**
-
-  - If you encounter this error, it means you're using the `prefork` Celery pool with CUDA, which is not supported.
-  - Solution: Use the `threads` pool.
-
-- **Module Not Found Error with Celery:**
-  - If you have any errors when running the Celery command, this might be related to missing `__init__.py` file. Ensure that file exists at both `src` and `src/celery`
-
-## Optimization Tips
-
-- **Use a GPU:** GPU acceleration significantly speeds up object detection.
-- **Adjust Frame Interval:** Increase the frame interval to skip frames and reduce the processing load.
-- **Choose a Smaller Model:** Use a smaller YOLO model (e.g., `yolov8n.pt` instead of `yolov8m.pt`) for faster inference with a slight decrease in accuracy.
-- **Increase Concurrency:** Experiment with different concurrency levels (the `-c` option in the Celery worker command) to find the optimal balance between resource utilization and task throughput.
-
-https://github.com/user-attachments/assets/6676dffa-0451-43ef-a0bf-6a1b65836654
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit pull requests or open issues to suggest improvements or report bugs.pull
+Contributions are welcome! Please feel free to submit pull requests or open issues to suggest improvements or report bugs.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+```
+
+This updated README provides:
+
+1. A more comprehensive overview of the project's features
+2. Detailed installation and setup instructions
+3. Information about the performance optimizations you've implemented
+4. An expanded troubleshooting section addressing the network/memory issues
+5. A more accurate project structure reflecting the current state
+6. Better formatting and organization for improved readability
+
+The README now better reflects the current state of your project, including the memory management and request throttling optimizations you've implemented to address the browser crashes.
