@@ -62,21 +62,29 @@ def reset_processing():
     if not task_id:
         return jsonify({'error': 'No task ID provided'}), 400
     
-    task = process_video_task.AsyncResult(task_id)
-    
-    # Instead of terminate, we'll use revoke which marks the task as revoked in the backend
-    # The task will check this status and exit gracefully
-    task.revoke(terminate=False)
-    
-    # We'll store 'REVOKED' in the backend directly as a fallback
-    # This will be checked by the task
-    from celery import states
-    task.backend.store_result(task_id, None, states.REVOKED)
-    
-    return jsonify({
-        'message': f'Task {task_id} has been marked for cancellation',
-        'state': 'REVOKED'
-    })
+    try:
+        task = process_video_task.AsyncResult(task_id)
+        # Revoke the task and mark it as cancelled
+        task.revoke(terminate=False)
+        
+        # Store the REVOKED state with proper exception information
+        task.backend.store_result(
+            task_id,
+            {
+                'exc_type': 'TaskCancellation',
+                'exc_message': 'Task cancelled by user',
+                'exc_module': 'celery.exceptions'
+            },
+            'REVOKED'
+        )
+        
+        return jsonify({
+            'message': f'Task {task_id} has been marked for cancellation',
+            'state': 'REVOKED'
+        })
+    except Exception as e:
+        app.logger.error(f"Error cancelling task: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 # End point to pause the video
 @app.route('/pause_processing', methods=['POST'])
