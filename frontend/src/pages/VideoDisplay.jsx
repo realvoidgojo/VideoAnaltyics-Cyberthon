@@ -12,7 +12,6 @@ import HeatmapAnalysis from "../components/HeatmapAnalysis";
 import HeatmapVideo from "../components/HeatmapVideo";
 import useVideoProcessing from "../components/useVideoProcessing";
 import useDetections from "../components/UseDetections";
-import ObjectFrequencyChart from "../components/ObjectFrequencyChart";
 import DetectionStatistics from "../components/DetectionStatistics";
 import { getDistinctColor } from "../components/utils/colorUtils";
 
@@ -622,19 +621,11 @@ const JobProcessing = ({ job, setJobs }) => {
           />
         )}
 
-        {/* Add the Object Frequency Chart */}
+        {/* Remove the standalone Object Frequency Chart and only keep the DetectionStatistics component */}
         {taskID && detections.length > 0 && (
-          <div className="mt-6">
-            <h2 className="text-xl font-semibold mb-2 text-gray-900">
-              Object Detection Frequency
-            </h2>
-            <ObjectFrequencyChart detections={detections} />
-          </div>
-        )}
-
-        {/* Detection Statistics */}
-        {taskID && detections.length > 0 && (
-          <DetectionStatistics detections={detections} />
+          <DetectionStatistics
+            detections={detections}
+          />
         )}
       </div>
     </div>
