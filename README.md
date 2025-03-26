@@ -185,15 +185,3 @@ Contributions are welcome! Please feel free to submit pull requests or open issu
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-```
-
-This updated README provides:
-
-1. A more comprehensive overview of the project's features
-2. Detailed installation and setup instructions
-3. Information about the performance optimizations you've implemented
-4. An expanded troubleshooting section addressing the network/memory issues
-5. A more accurate project structure reflecting the current state
-6. Better formatting and organization for improved readability
-
-The README now better reflects the current state of your project, including the memory management and request throttling optimizations you've implemented to address the browser crashes.
