@@ -20,7 +20,7 @@ ChartJS.register(
   Legend
 );
 
-const ObjectFrequencyChart = ({ detections }) => {
+const ObjectFrequencyChart = ({ detections, useTrackIds = false }) => {
   const [chartData, setChartData] = useState({
     labels: [],
     datasets: [],
@@ -31,16 +31,27 @@ const ObjectFrequencyChart = ({ detections }) => {
 
     // Count frequency of each object class
     const objectCounts = {};
+    const uniqueObjects = new Set(); // Track unique objects by class+id
     
     // Process all frames
     detections.forEach(frame => {
       // Process all detections in this frame
       frame.forEach(detection => {
         const className = detection.class_name;
-        if (objectCounts[className]) {
-          objectCounts[className]++;
+        const trackId = detection.track_id;
+        
+        if (useTrackIds && trackId) {
+          // Create a unique identifier for this object
+          const objectKey = `${className}_${trackId}`;
+          
+          // Only count if we haven't seen this exact object before
+          if (!uniqueObjects.has(objectKey)) {
+            uniqueObjects.add(objectKey);
+            objectCounts[className] = (objectCounts[className] || 0) + 1;
+          }
         } else {
-          objectCounts[className] = 1;
+          // Fallback to simple counting if not using track IDs
+          objectCounts[className] = (objectCounts[className] || 0) + 1;
         }
       });
     });
@@ -49,10 +60,19 @@ const ObjectFrequencyChart = ({ detections }) => {
     const labels = Object.keys(objectCounts);
     const data = Object.values(objectCounts);
     
-    // Generate random colors for each class
-    const backgroundColors = labels.map(() => 
-      `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.6)`
-    );
+    // Generate consistent colors for each class
+    const backgroundColors = labels.map((label, index) => {
+      // Use a hash function to generate consistent colors for the same class names
+      const hash = label.split('').reduce((acc, char) => {
+        return char.charCodeAt(0) + ((acc << 5) - acc);
+      }, 0);
+      
+      const r = Math.abs((hash & 0xFF0000) >> 16);
+      const g = Math.abs((hash & 0x00FF00) >> 8);
+      const b = Math.abs(hash & 0x0000FF);
+      
+      return `rgba(${r}, ${g}, ${b}, 0.6)`;
+    });
     
     setChartData({
       labels,
@@ -66,7 +86,7 @@ const ObjectFrequencyChart = ({ detections }) => {
         },
       ],
     });
-  }, [detections]);
+  }, [detections, useTrackIds]);
 
   const options = {
     responsive: true,
