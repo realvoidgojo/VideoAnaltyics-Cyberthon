@@ -16,6 +16,47 @@ const useDetections = (taskID) => {
   const [heatmapVideoUrl, setHeatmapVideoUrl] = useState(null);
   const [objectFrequency, setObjectFrequency] = useState({});
 
+  // Add a cache mechanism for detections
+  const [lastFetchTime, setLastFetchTime] = useState(0);
+  const FETCH_COOLDOWN = 5000; // 5 seconds between fetches
+
+  // Add memory cleanup effect
+  useEffect(() => {
+    // Memory cleanup function
+    const cleanupMemory = () => {
+      // Force garbage collection if possible (not directly possible in JS, but can hint)
+      if (window.gc) {
+        window.gc();
+      }
+      
+      // Clear any cached images that might be in memory
+      const images = document.querySelectorAll('img');
+      images.forEach(img => {
+        if (!isElementInViewport(img)) {
+          img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+        }
+      });
+    };
+    
+    // Helper function to check if element is in viewport
+    const isElementInViewport = (el) => {
+      const rect = el.getBoundingClientRect();
+      return (
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+        rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+      );
+    };
+    
+    // Run cleanup every 30 seconds
+    const cleanupInterval = setInterval(cleanupMemory, 30000);
+    
+    return () => {
+      clearInterval(cleanupInterval);
+    };
+  }, []);
+
   const fetchTaskResult = async (task_id) => {
     try {
       const response = await axios.get(
@@ -117,19 +158,33 @@ const useDetections = (taskID) => {
     }
   };
 
+  // In your useEffect that fetches detections
   useEffect(() => {
     if (!taskID) return;
-
-    // Initial fetch
-    fetchTaskResult(taskID);
-
-    // Set up polling interval
-    const intervalId = setInterval(() => {
-      fetchTaskResult(taskID);
-    }, 2000); // Poll every 2 seconds
-
-    // Clean up interval on component unmount
-    return () => clearInterval(intervalId);
+    
+    const now = Date.now();
+    // Only fetch if enough time has passed since last fetch
+    if (now - lastFetchTime < FETCH_COOLDOWN) {
+      return;
+    }
+    
+    const fetchDetections = async () => {
+      try {
+        setLastFetchTime(Date.now());
+        fetchTaskResult(taskID);
+      } catch (error) {
+        console.error("Error fetching detections:", error);
+      }
+    };
+    
+    fetchDetections();
+    
+    // Set up a less frequent polling interval for completed tasks
+    const intervalId = setInterval(fetchDetections, 10000); // 10 seconds
+    
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [taskID]);
 
   return {
