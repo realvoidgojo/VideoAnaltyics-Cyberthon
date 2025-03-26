@@ -12,7 +12,10 @@ import HeatmapAnalysis from "../components/HeatmapAnalysis";
 import HeatmapVideo from "../components/HeatmapVideo";
 import useVideoProcessing from "../components/useVideoProcessing";
 import useDetections from "../components/UseDetections";
+import ObjectFrequencyChart from "../components/ObjectFrequencyChart";
+import DetectionStatistics from "../components/DetectionStatistics";
 import { getDistinctColor } from "../components/utils/colorUtils";
+
 import {
   Plus,
   Trash2,
@@ -237,6 +240,7 @@ const JobProcessing = ({ job, setJobs }) => {
     useHeatmap: hasHeatmapData,
     heatmapAnalysis,
     heatmapVideoUrl,
+    objectFrequency, // Make sure this is included in the destructuring
   } = useDetections(taskID);
 
   // Start timer when processing begins
@@ -255,7 +259,9 @@ const JobProcessing = ({ job, setJobs }) => {
 
     const intervalId = setInterval(async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/task_status/${taskID}`);
+        const response = await axios.get(
+          `http://localhost:5000/task_status/${taskID}`
+        );
         const { state, status } = response.data;
 
         // Extract progress percentage and status message
@@ -275,7 +281,7 @@ const JobProcessing = ({ job, setJobs }) => {
             const elapsedMs = new Date() - processingStartTime.current;
             const totalEstimatedMs = (elapsedMs * 100) / status.percent;
             const remainingMs = totalEstimatedMs - elapsedMs;
-            
+
             if (remainingMs > 0) {
               // Convert to readable format: less than a minute or X minutes Y seconds
               const remainingSec = Math.floor(remainingMs / 1000);
@@ -284,7 +290,9 @@ const JobProcessing = ({ job, setJobs }) => {
               } else {
                 const mins = Math.floor(remainingSec / 60);
                 const secs = remainingSec % 60;
-                setEstimatedTimeLeft(`Approx. ${mins} min ${secs} sec remaining`);
+                setEstimatedTimeLeft(
+                  `Approx. ${mins} min ${secs} sec remaining`
+                );
               }
             }
           }
@@ -294,7 +302,7 @@ const JobProcessing = ({ job, setJobs }) => {
         if (state === "SUCCESS" || state === "FAILURE" || state === "REVOKED") {
           clearInterval(intervalId);
           setEstimatedTimeLeft(null);
-          
+
           if (state === "SUCCESS") {
             setProgress(100);
             setProcessingStage("Processing complete");
@@ -310,7 +318,7 @@ const JobProcessing = ({ job, setJobs }) => {
   }, [taskID, isProcessing]);
 
   // Other existing useEffect hooks and functions...
-  
+
   useEffect(() => {
     if (detections && detections.length > 0) {
       const detectedClasses = new Set(
@@ -472,10 +480,13 @@ const JobProcessing = ({ job, setJobs }) => {
         {/* Progress Bar */}
         {isProcessing && (
           <div className="mt-4">
-            <div className="w-full bg-gray-200 rounded-full" style={{ height: '20px', overflow: 'hidden' }}>
+            <div
+              className="w-full bg-gray-200 rounded-full"
+              style={{ height: "20px", overflow: "hidden" }}
+            >
               <div
                 className="bg-blue-600 rounded-full flex items-center justify-center transition-all duration-300"
-                style={{ width: `${progress}%`, height: '20px' }}
+                style={{ width: `${progress}%`, height: "20px" }}
               >
                 <span className="text-xs text-white font-medium">
                   {Math.round(progress)}%
@@ -484,15 +495,13 @@ const JobProcessing = ({ job, setJobs }) => {
             </div>
             <div className="flex justify-between mt-2 text-sm text-gray-600">
               <div>
-                {job.useHeatmap ? (
-                  processingStage.includes("heatmap") ? 
-                    "Phase 1: Heatmap Analysis" : 
-                    processingStage.includes("Processing frame") ? 
-                      "Phase 2: Object Detection" : 
-                      processingStage
-                ) : (
-                  "Object Detection"
-                )}
+                {job.useHeatmap
+                  ? processingStage.includes("heatmap")
+                    ? "Phase 1: Heatmap Analysis"
+                    : processingStage.includes("Processing frame")
+                    ? "Phase 2: Object Detection"
+                    : processingStage
+                  : "Object Detection"}
               </div>
               {estimatedTimeLeft && (
                 <div className="font-medium">{estimatedTimeLeft}</div>
@@ -604,6 +613,21 @@ const JobProcessing = ({ job, setJobs }) => {
             containerWidth={job.containerWidth}
             classColors={job.classColors}
           />
+        )}
+
+        {/* Add the Object Frequency Chart */}
+        {taskID && detections.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-xl font-semibold mb-2 text-gray-900">
+              Object Detection Frequency
+            </h2>
+            <ObjectFrequencyChart detections={detections} />
+          </div>
+        )}
+
+        {/* Detection Statistics */}
+        {taskID && detections.length > 0 && (
+          <DetectionStatistics detections={detections} />
         )}
       </div>
     </div>
