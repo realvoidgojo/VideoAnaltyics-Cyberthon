@@ -14,6 +14,7 @@ const useDetections = (taskID) => {
   const [heatmapPath, setHeatmapPath] = useState(null);
   const [heatmapAnalysis, setHeatmapAnalysis] = useState({});
   const [heatmapVideoUrl, setHeatmapVideoUrl] = useState(null);
+  const [objectFrequency, setObjectFrequency] = useState({});
 
   const fetchTaskResult = async (task_id) => {
     try {
@@ -29,6 +30,19 @@ const useDetections = (taskID) => {
         setPreprocessedHeight(result.preprocessed_height || 0);
         setDetections(result.results || []);
         
+        // Calculate object frequency
+        if (result.results && result.results.length > 0) {
+          const counts = {};
+          result.results.forEach(frame => {
+            frame.forEach(detection => {
+              const className = detection.class_name;
+              counts[className] = (counts[className] || 0) + 1;
+            });
+          });
+          setObjectFrequency(counts);
+          console.log("Object frequency calculated:", counts);
+        }
+        
         // Always check useHeatmap flag first
         if (result.use_heatmap) {
           console.log("Heatmap was requested for this task");
@@ -40,75 +54,82 @@ const useDetections = (taskID) => {
             console.log(`Set heatmap video URL for task ${task_id}`);
           }
           
-          // Set heatmap frames if available
+          // Check if heatmap frames are available
           if (result.heatmap_frames && result.heatmap_frames.length > 0) {
             console.log(`Received ${result.heatmap_frames.length} heatmap frames`);
             setHeatmapFrames(result.heatmap_frames);
-          } else {
-            console.log("No heatmap frames available in result");
           }
           
-          // Set heatmap analysis data if available
+          // Check if heatmap analysis data is available
           if (result.heatmap_analysis) {
             console.log("Setting heatmap analysis data:", result.heatmap_analysis);
             setHeatmapAnalysis(result.heatmap_analysis);
-          } else {
-            console.log("No heatmap analysis data in result");
           }
-        } else {
-          // Make sure heatmap is disabled if not requested
-          setUseHeatmap(false);
         }
         
         setProcessingStatus("Completed");
-      } else if (
-        response.data.state === "PENDING" ||
-        response.data.state === "PROCESSING" ||
-        response.data.state === "PROGRESS" 
-      ) {
-        const status = response.data.status || {};
-        const progressText = status.percent ? `(${status.percent}%)` : '';
-        const statusText = status.status || 'Processing...';
-        setProcessingStatus(`${statusText} ${progressText}`);
+      } else if (response.data.state === "PROGRESS" && response.data.status) {
+        setProcessingStatus(response.data.status.status || "Processing...");
+        
+        // Check if we have partial results
+        if (response.data.status.results) {
+          setDetections(response.data.status.results || []);
+          
+          // Calculate partial object frequency
+          if (response.data.status.results.length > 0) {
+            const counts = {};
+            response.data.status.results.forEach(frame => {
+              frame.forEach(detection => {
+                const className = detection.class_name;
+                counts[className] = (counts[className] || 0) + 1;
+              });
+            });
+            setObjectFrequency(counts);
+          }
+        }
+        
+        // Check if we have partial heatmap data
+        if (response.data.status.use_heatmap) {
+          setUseHeatmap(true);
+          
+          if (task_id) {
+            setHeatmapVideoUrl(`http://localhost:5000/stream_heatmap_video/${task_id}`);
+          }
+          
+          if (response.data.status.heatmap_frames) {
+            setHeatmapFrames(response.data.status.heatmap_frames);
+          }
+          
+          if (response.data.status.heatmap_analysis) {
+            setHeatmapAnalysis(response.data.status.heatmap_analysis);
+          }
+        }
       } else if (response.data.state === "FAILURE") {
-        setProcessingStatus(`Failed: ${response.data.status}`);
+        setProcessingStatus(`Error: ${response.data.status}`);
       } else if (response.data.state === "REVOKED") {
-        // Handle revoked tasks
-        setProcessingStatus(`Task cancelled by user`);
-        // Clear all data since the task was cancelled
-        setDetections([]);
-        setHeatmapFrames([]);
-        setHeatmapAnalysis({});
-        setHeatmapVideoUrl(null);
-        // Stop polling for this task
-        return false;
+        setProcessingStatus("Task was cancelled");
+      } else {
+        setProcessingStatus(`Status: ${response.data.state}`);
       }
     } catch (error) {
       console.error("Error fetching task result:", error);
-      setProcessingStatus("Error fetching results.");
+      setProcessingStatus(`Error: ${error.message}`);
     }
   };
 
   useEffect(() => {
-    let intervalId;
-    if (taskID) {
-      intervalId = setInterval(() => {
-        // If fetchTaskResult returns false, it means we should stop polling
-        const result = fetchTaskResult(taskID);
-        if (result === false) {
-          clearInterval(intervalId);
-        }
-      }, 2000);
-    }
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [taskID]);
+    if (!taskID) return;
 
-  useEffect(() => {
-    if (taskID) {
+    // Initial fetch
+    fetchTaskResult(taskID);
+
+    // Set up polling interval
+    const intervalId = setInterval(() => {
       fetchTaskResult(taskID);
-    }
+    }, 2000); // Poll every 2 seconds
+
+    // Clean up interval on component unmount
+    return () => clearInterval(intervalId);
   }, [taskID]);
 
   return {
@@ -118,12 +139,12 @@ const useDetections = (taskID) => {
     preprocessedWidth,
     preprocessedHeight,
     processingStatus,
-    heatmapPath,
     heatmapFrames,
     useHeatmap,
+    heatmapPath,
     heatmapAnalysis,
     heatmapVideoUrl,
-    setDetections,
+    objectFrequency,
   };
 };
 
