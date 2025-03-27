@@ -13,6 +13,7 @@ const VideoCanvas = ({
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const animationFrameId = useRef(null);
+  const lastDrawnFrame = useRef(-1);
 
   // Canvas scaling calculations
   const getScaleFactors = () => ({
@@ -20,50 +21,62 @@ const VideoCanvas = ({
     height: canvasRef.current?.height / preprocessedHeight || 1,
   });
 
-  // Detection drawing handler
+  // Detection drawing handler with frame synchronization
   const drawFrameDetections = () => {
     const ctx = canvasRef.current?.getContext("2d");
     const video = videoRef.current;
-    if (!ctx || !video) return;
+    if (!ctx || !video || !detections?.length) return;
 
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.drawImage(video, 0, 0, ctx.canvas.width, ctx.canvas.height);
+    // Calculate current frame index with better precision
+    const frameRate = detections.length / video.duration;
+    const currentFrame = Math.floor(video.currentTime * frameRate);
 
-    const currentTime = video.currentTime;
-    const frameIndex = Math.floor(
-      currentTime * (detections.length / video.duration)
-    );
-    const { width: wScale, height: hScale } = getScaleFactors();
+    // Only redraw if we're on a new frame
+    if (
+      currentFrame !== lastDrawnFrame.current &&
+      currentFrame < detections.length
+    ) {
+      lastDrawnFrame.current = currentFrame;
 
-    if (detections[frameIndex]) {
-      detections[frameIndex].forEach(
-        ({ class_name, confidence, box, track_id }) => {
-          if (!box || box.length !== 4) return;
+      // Clear and draw video frame
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.drawImage(video, 0, 0, ctx.canvas.width, ctx.canvas.height);
 
-          const [x1, y1, x2, y2] = box.map(
-            (val, i) => val * (i % 2 === 0 ? wScale : hScale)
-          );
+      const { width: wScale, height: hScale } = getScaleFactors();
 
-          const color = classColors[class_name]?.hex || "#ff0000";
-          const labelText = track_id
-            ? `${class_name} ${confidence.toFixed(2)} (ID: ${track_id})`
-            : `${class_name} ${confidence.toFixed(2)}`;
+      // Draw detections for current frame
+      if (detections[currentFrame]) {
+        detections[currentFrame].forEach(
+          ({ class_name, confidence, box, track_id }) => {
+            if (!box || box.length !== 4) return;
 
-          drawBoundingBox(ctx, x1, y1, x2, y2, color);
-          drawLabel(ctx, x1, y1, labelText, color);
-        }
-      );
+            const [x1, y1, x2, y2] = box.map(
+              (val, i) => val * (i % 2 === 0 ? wScale : hScale)
+            );
+
+            const color = classColors[class_name]?.hex || "#ff0000";
+            const labelText = track_id
+              ? `${class_name} ${confidence.toFixed(2)} (ID: ${track_id})`
+              : `${class_name} ${confidence.toFixed(2)}`;
+
+            drawBoundingBox(ctx, x1, y1, x2, y2, color);
+            drawLabel(ctx, x1, y1, labelText, color);
+          }
+        );
+      }
     }
 
+    // Request next frame
     animationFrameId.current = requestAnimationFrame(drawFrameDetections);
   };
 
-  // Canvas sizing and event handlers
+  // Initialize video and canvas
   useEffect(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
+    // Set initial canvas size
     const updateCanvasSize = () => {
       if (video.videoWidth && video.videoHeight) {
         const aspectRatio = video.videoWidth / video.videoHeight;
@@ -72,38 +85,59 @@ const VideoCanvas = ({
       }
     };
 
+    // Event handlers
+    const handleTimeUpdate = () => (lastDrawnFrame.current = -1);
     const handlePlay = () => {
+      lastDrawnFrame.current = -1;
       animationFrameId.current = requestAnimationFrame(drawFrameDetections);
     };
 
+    // Add event listeners
     video.addEventListener("loadedmetadata", updateCanvasSize);
     video.addEventListener("play", handlePlay);
+    video.addEventListener("seeking", handleTimeUpdate);
+    video.addEventListener("seeked", handleTimeUpdate);
 
+    // Initial setup
+    if (video.readyState >= 2) {
+      updateCanvasSize();
+    }
+
+    // Cleanup
     return () => {
       video.removeEventListener("loadedmetadata", updateCanvasSize);
       video.removeEventListener("play", handlePlay);
-      cancelAnimationFrame(animationFrameId.current);
+      video.removeEventListener("seeking", handleTimeUpdate);
+      video.removeEventListener("seeked", handleTimeUpdate);
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+      }
     };
   }, [videoSource, containerWidth]);
 
-  // Detection updates handler
+  // Handle detection updates
   useEffect(() => {
-    if (videoRef.current?.paused) return;
-    drawFrameDetections();
+    if (!videoRef.current?.paused) {
+      lastDrawnFrame.current = -1;
+      drawFrameDetections();
+    }
   }, [detections, classColors]);
 
   return (
-    <div className="flex flex-row w-full p-4">
-      <div className="w-1/2 mr-4">
+    <div className="grid grid-cols-2 gap-4 w-full">
+      <div className="relative aspect-video">
         <video
           ref={videoRef}
           src={videoSource}
           controls
-          className="w-full h-auto object-contain"
+          className="absolute inset-0 w-full h-full object-contain"
         />
       </div>
-      <div className="w-1/2">
-        <canvas ref={canvasRef} className="w-full h-auto pointer-events-none" />
+      <div className="relative aspect-video">
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full object-contain"
+        />
       </div>
     </div>
   );
@@ -111,7 +145,7 @@ const VideoCanvas = ({
 
 VideoCanvas.propTypes = {
   videoSource: PropTypes.string,
-  detections: PropTypes.arrayOf(PropTypes.object),
+  detections: PropTypes.arrayOf(PropTypes.array),
   preprocessedWidth: PropTypes.number,
   preprocessedHeight: PropTypes.number,
   containerWidth: PropTypes.number,
