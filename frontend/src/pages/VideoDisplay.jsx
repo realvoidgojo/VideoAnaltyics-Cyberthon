@@ -25,6 +25,7 @@ import {
   Loader2,
   IdCard,
   Video,
+  CheckCircle, // Add this import for the check icon
 } from "lucide-react";
 
 const VideoDisplay = () => {
@@ -260,18 +261,20 @@ const JobProcessing = ({ job, setJobs }) => {
     let pollCount = 0;
     let pollInterval = 2000; // Start with 2 seconds
     const maxPolls = 300; // Maximum number of polls (10 minutes at 2-second intervals)
-    
+
     const pollTaskStatus = async () => {
       try {
         pollCount++;
-        
+
         // If we've reached the maximum number of polls, stop polling
         if (pollCount > maxPolls) {
-          console.log(`Reached maximum number of polls (${maxPolls}). Stopping.`);
+          console.log(
+            `Reached maximum number of polls (${maxPolls}). Stopping.`
+          );
           clearInterval(intervalId);
           return;
         }
-        
+
         const response = await axios.get(
           `http://localhost:5000/task_status/${taskID}`
         );
@@ -332,7 +335,7 @@ const JobProcessing = ({ job, setJobs }) => {
         console.error("Error fetching task status:", error);
         // Increase polling interval on error (exponential backoff)
         pollInterval = Math.min(pollInterval * 1.5, 10000); // Max 10 seconds
-        
+
         // If we've had too many errors, stop polling
         if (pollCount > 10) {
           clearInterval(intervalId);
@@ -342,7 +345,7 @@ const JobProcessing = ({ job, setJobs }) => {
 
     // Initial poll
     pollTaskStatus();
-    
+
     // Set up interval with dynamic polling rate
     intervalId = setInterval(pollTaskStatus, pollInterval);
 
@@ -508,8 +511,18 @@ const JobProcessing = ({ job, setJobs }) => {
 
           {/* Status indicator */}
           {isProcessing && (
-            <div className="bg-yellow-100 px-3 py-1 rounded-lg text-sm text-yellow-700 flex items-center">
-              <Loader2 className="animate-spin h-4 w-4 mr-1" />
+            <div
+              className={`px-3 py-1 rounded-lg text-sm flex items-center ${
+                processingStage === "Processing complete"
+                  ? "bg-green-100 text-green-700"
+                  : "bg-yellow-100 text-yellow-700"
+              }`}
+            >
+              {processingStage === "Processing complete" ? (
+                <CheckCircle className="h-4 w-4 mr-1" />
+              ) : (
+                <Loader2 className="animate-spin h-4 w-4 mr-1" />
+              )}
               {processingStage || "Processing..."}
             </div>
           )}
@@ -655,9 +668,7 @@ const JobProcessing = ({ job, setJobs }) => {
 
         {/* Remove the standalone Object Frequency Chart and only keep the DetectionStatistics component */}
         {taskID && detections.length > 0 && (
-          <DetectionStatistics
-            detections={detections}
-          />
+          <DetectionStatistics detections={detections} />
         )}
       </div>
     </div>
