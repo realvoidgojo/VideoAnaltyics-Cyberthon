@@ -11,7 +11,7 @@ This project demonstrates real-time object detection in videos using a React fro
 - **Multiple Video Processing**: Process multiple videos simultaneously with job management
 - **Customizable Detection Parameters**: Adjust frame intervals and model selection
 
-## Prerequisites
+## Prerequisites , checkout [setup](./setup/readme.md)
 
 Before you begin, ensure that you have the following installed:
 
