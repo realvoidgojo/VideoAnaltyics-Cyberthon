@@ -156,14 +156,5 @@ npm run dev
 
 - Opens in browser at: `http://localhost:5173`
 
----
 
-## ✅ You're Ready!
-
-Happy hacking with **VideoAnalytics-Cyberthon**!  
-Feel free to open an issue or PR on the [GitHub repo](https://github.com/realvoidgojo/VideoAnaltyics-Cyberthon) if you run into any trouble.
-
----
-
-Let me know if you'd like this exported as a PDF or markdown file!
 
