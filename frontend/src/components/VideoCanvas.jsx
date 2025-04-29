@@ -124,8 +124,8 @@ const VideoCanvas = ({
   }, [detections, classColors]);
 
   return (
-    <div className="grid grid-cols-2 gap-4 w-full">
-      <div className="relative aspect-video">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+      <div className="relative aspect-video bg-black rounded-lg shadow-md overflow-hidden">
         <video
           ref={videoRef}
           src={videoSource}
@@ -133,7 +133,7 @@ const VideoCanvas = ({
           className="absolute inset-0 w-full h-full object-contain"
         />
       </div>
-      <div className="relative aspect-video">
+      <div className="relative aspect-video bg-black rounded-lg shadow-md overflow-hidden">
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full object-contain"

@@ -7,6 +7,7 @@ import base64
 import tempfile
 from progress.bar import Bar
 
+
 # Configure logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
