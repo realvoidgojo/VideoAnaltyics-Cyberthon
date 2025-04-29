@@ -82,7 +82,8 @@ const HeatmapVideo = ({ taskID, containerWidth, visible }) => {
       preload: "auto",
       responsive: true,
       fluid: true,
-      width: containerWidth,
+      fill: true, // Make player fill the container
+      aspectRatio: "16:9", // Set a standard aspect ratio
       html5: {
         vhs: {
           overrideNative: true,
@@ -160,12 +161,12 @@ const HeatmapVideo = ({ taskID, containerWidth, visible }) => {
   if (!visible) return null;
 
   return (
-    <div className="video-container relative space-y-4">
-      <div style={{ width: containerWidth || "100%" }}>
+    <div className="video-container relative space-y-4 w-full">
+      <div className="w-full max-w-full mx-auto bg-gray-50 rounded-lg p-4 shadow-md">
         {isLoading && (
-          <div className="absolute inset-0 flex justify-center items-center bg-gray-100 rounded-lg">
+          <div className="absolute inset-0 flex justify-center items-center bg-gray-800 bg-opacity-70 rounded-lg z-10">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
-            <span className="ml-3 text-gray-700">Loading heatmap video...</span>
+            <span className="ml-3 text-white">Loading heatmap video...</span>
           </div>
         )}
 
@@ -176,10 +177,10 @@ const HeatmapVideo = ({ taskID, containerWidth, visible }) => {
           </div>
         )}
 
-        <div data-vjs-player className="w-full">
+        <div data-vjs-player className="w-full aspect-video">
           <video
             ref={videoRef}
-            className="video-js vjs-big-play-centered vjs-default-skin"
+            className="video-js vjs-big-play-centered vjs-default-skin w-full h-full rounded-md overflow-hidden"
             playsInline
           />
         </div>
@@ -189,7 +190,7 @@ const HeatmapVideo = ({ taskID, containerWidth, visible }) => {
           <div className="mt-4 flex justify-start">
             <button
               onClick={openInExternalPlayer}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
             >
               <ArrowUpRightFromSquare className="h-5 w-5" />
               Open in External Player
