@@ -1,10 +1,10 @@
 import React from "react";
 import { X } from "lucide-react";
 import VideoUpload from "./VideoUpload";
-import ModelSelection from "./ModelSelection";
-import FrameIntervalInput from "./FrameIntervalInput";
-import ContainerWidthInput from "./ContainerWidthInput";
-import HeatmapCheckbox from "./HeatmapCheckbox";
+import ModelSelection from "../inputs/ModelSelection";
+import FrameIntervalInput from "../inputs/FrameIntervalInput";
+import ContainerWidthInput from "../inputs/ContainerWidthInput";
+import HeatmapCheckbox from "../heatmap/HeatmapCheckbox";
 
 const VideoUploadDialog = ({
   onClose,
