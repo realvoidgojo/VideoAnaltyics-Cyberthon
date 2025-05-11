@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { Plus, Trash2, Film } from "lucide-react";
-import VideoUploadDialog from "../components/VideoUploadDialog";
-import JobCard from "../components/JobCard";
+import VideoUploadDialog from "../components/video/VideoUploadDialog";
+import JobCard from "../components/ui/JobCard";
 
 const VideoDisplay = () => {
   const [showDialog, setShowDialog] = useState(false);

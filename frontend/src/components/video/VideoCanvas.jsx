@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import PropTypes from "prop-types";
-import { drawBoundingBox, drawLabel } from "./utils/canvasUtils";
+import { drawBoundingBox, drawLabel } from "../utils/canvasUtils";
 
 const VideoCanvas = ({
   videoSource,

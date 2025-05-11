@@ -11,15 +11,15 @@ import {
   ArrowDownIcon,
   DownloadIcon,
 } from "lucide-react";
-import VideoCanvas from "./VideoCanvas";
-import HeatmapVideo from "./HeatmapVideo";
-import HeatmapAnalysis from "./HeatmapAnalysis";
+import VideoCanvas from "../video/VideoCanvas";
+import HeatmapVideo from "../heatmap/HeatmapVideo";
+import HeatmapAnalysis from "../heatmap/HeatmapAnalysis";
 import ClassColorCustomization from "./ClassColorCustomization";
-import DetectionStatistics from "./DetectionStatistics";
+import DetectionStatistics from "../charts/DetectionStatistics";
 import ProcessingControls from "./ProcessingControls";
-import useVideoProcessing from "./useVideoProcessing";
-import useDetections from "./UseDetections";
-import { getDistinctColor } from "./utils/colorUtils";
+import useVideoProcessing from "../hooks/useVideoProcessing";
+import useDetections from "../hooks/UseDetections";
+import { getDistinctColor } from "../utils/colorUtils";
 import JobHeader from "./JobHeader";
 import ProgressBar from "./ProgressBar";
 import axios from "axios";
