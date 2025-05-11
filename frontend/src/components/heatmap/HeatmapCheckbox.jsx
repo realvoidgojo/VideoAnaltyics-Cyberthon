@@ -1,29 +1,30 @@
 // HeatmapCheckbox.jsx
 import React from "react";
+import PropTypes from "prop-types";
+import Checkbox from "../ui/Checkbox";
+import { Thermometer } from "lucide-react";
 
 const HeatmapCheckbox = ({ useHeatmap, setUseHeatmap }) => {
-  return (
-    <div className="mb-4 p-4 border   border-blue-400 rounded-lg bg-blue-100">
-      <div className="flex items-center">
-        <label className="flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            checked={useHeatmap}
-            onChange={(e) => setUseHeatmap(e.target.checked)}
-            className="form-checkbox h-5 w-5 text-blue-600"
-          />
-          <span className="ml-2 text-sm font-medium text-gray-700">
-            Enable Heatmap Analysis
-          </span>
-        </label>
-      </div>
+  const handleChange = (e) => {
+    setUseHeatmap(e.target.checked);
+  };
 
-      <p className="text-xs text-gray-600 mt-2">
-        This static video feed includes a heatmap highlighting movement
-        intensity over time
-      </p>
+  return (
+    <div className="p-4 rounded-lg">
+      <Checkbox
+        label="Enable Heatmap Analysis"
+        checked={useHeatmap}
+        onChange={handleChange}
+        helperText="Generate a heatmap visualization highlighting movement intensity over time"
+        labelClassName="font-medium"
+      />
     </div>
   );
+};
+
+HeatmapCheckbox.propTypes = {
+  useHeatmap: PropTypes.bool.isRequired,
+  setUseHeatmap: PropTypes.func.isRequired,
 };
 
 export default HeatmapCheckbox;

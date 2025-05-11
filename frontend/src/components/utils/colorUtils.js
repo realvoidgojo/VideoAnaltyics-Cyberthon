@@ -1,55 +1,107 @@
 // utils/colorUtils.js
 
 /**
+ * Converts HSL to Hex color format.
+ *
+ * @param {number} h - Hue (0-360).
+ * @param {number} s - Saturation (0-100).
+ * @param {number} l - Lightness (0-100).
+ * @returns {string} - Hex color string.
+ */
+export function hslToHex(h, s, l) {
+  // Convert s and l to decimals
+  s /= 100;
+  l /= 100;
+
+  // Calculate RGB values
+  let c = (1 - Math.abs(2 * l - 1)) * s;
+  let x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  let m = l - c / 2;
+  let r = 0,
+    g = 0,
+    b = 0;
+
+  if (0 <= h && h < 60) {
+    r = c;
+    g = x;
+    b = 0;
+  } else if (60 <= h && h < 120) {
+    r = x;
+    g = c;
+    b = 0;
+  } else if (120 <= h && h < 180) {
+    r = 0;
+    g = c;
+    b = x;
+  } else if (180 <= h && h < 240) {
+    r = 0;
+    g = x;
+    b = c;
+  } else if (240 <= h && h < 300) {
+    r = x;
+    g = 0;
+    b = c;
+  } else if (300 <= h && h < 360) {
+    r = c;
+    g = 0;
+    b = x;
+  }
+
+  // Convert to hex
+  r = Math.round((r + m) * 255)
+    .toString(16)
+    .padStart(2, "0");
+  g = Math.round((g + m) * 255)
+    .toString(16)
+    .padStart(2, "0");
+  b = Math.round((b + m) * 255)
+    .toString(16)
+    .padStart(2, "0");
+
+  return `#${r}${g}${b}`;
+}
+
+/**
  * Generates a distinct color in hex format.
  * Ensures the color is sufficiently different from existing colors.
  *
- * @param {Array<number>} existingColors - Array of existing hues (0-360).
+ * @param {Array<number>} existingHues - Array of existing hues (0-360).
  * @returns {Object} - An object containing the hue and hex color.
  */
-export const getDistinctColor = (existingColors) => {
-  let hue = Math.random() * 360; // Initial random hue
-  const minHueDifference = 30; // Minimum degrees of hue difference
+export const getDistinctColor = (existingHues = []) => {
+  // Find a hue that's maximally distant from existing hues
+  let newHue = Math.floor(Math.random() * 360);
 
-  // Function to calculate the hue difference
-  const hueDifference = (hue1, hue2) => {
-    let diff = Math.abs(hue1 - hue2);
-    return Math.min(diff, 360 - diff);
-  };
+  if (existingHues.length > 0) {
+    // Try to find a distinct hue
+    let bestHue = newHue;
+    let maxDistance = 0;
 
-  // Ensure the new color is distinct from existing colors
-  if (existingColors.length > 0) {
-    let validHue = false;
-    let attempts = 0;
-    while (!validHue && attempts < 100) {
-      validHue = true;
-      for (let i = 0; i < existingColors.length; i++) {
-        const existingHue = existingColors[i];
-        if (hueDifference(hue, existingHue) < minHueDifference) {
-          hue = Math.random() * 360; // Generate a new hue
-          validHue = false;
-          break;
-        }
+    for (let testHue = 0; testHue < 360; testHue += 10) {
+      let minDistance = 361;
+
+      for (const existingHue of existingHues) {
+        const distance = Math.min(
+          Math.abs(testHue - existingHue),
+          360 - Math.abs(testHue - existingHue)
+        );
+        minDistance = Math.min(minDistance, distance);
       }
-      attempts++;
+
+      if (minDistance > maxDistance) {
+        maxDistance = minDistance;
+        bestHue = testHue;
+      }
     }
+
+    newHue = bestHue;
   }
 
-  // Convert HSL to hex
-  const hslToHex = (h, s, l) => {
-    l /= 100;
-    const a = (s * Math.min(l, 1 - l)) / 100;
-    const f = (n) => {
-      const k = (n + h / 30) % 12;
-      const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-      return Math.round(255 * color)
-        .toString(16)
-        .padStart(2, "0"); // Convert to Hex and pad
-    };
-    return `#${f(0)}${f(8)}${f(4)}`;
-  };
+  // Convert to hex directly
+  const hex = hslToHex(newHue, 70, 50);
 
-  // Convert the HSL value to Hex
-  const hexColor = hslToHex(hue, 90, 50); // High saturation and brightness
-  return { hue: hue, hex: hexColor };
+  return {
+    hue: newHue,
+    hex: hex,
+  };
 };

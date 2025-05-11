@@ -10,6 +10,9 @@ import {
   VideoIcon,
   ArrowDownIcon,
   DownloadIcon,
+  Smartphone,
+  Tablet,
+  Monitor,
 } from "lucide-react";
 import VideoCanvas from "../video/VideoCanvas";
 import HeatmapVideo from "../heatmap/HeatmapVideo";
@@ -23,9 +26,10 @@ import { getDistinctColor } from "../utils/colorUtils";
 import JobHeader from "./JobHeader";
 import ProgressBar from "./ProgressBar";
 import axios from "axios";
+import { useJobContext } from "../../context/JobContext";
 
-const JobCard = ({ job, setJobs }) => {
-  // Keep all existing state except showAnalysis
+const JobCard = ({ job }) => {
+  const { updateJob, removeJob, toggleHeatmapView } = useJobContext();
   const {
     isProcessing,
     isVideoPaused,
@@ -36,15 +40,13 @@ const JobCard = ({ job, setJobs }) => {
     useHeatmap: processingWithHeatmap,
   } = useVideoProcessing();
 
-  // Remove the showAnalysis state - we're always showing analysis in Heatmap View now
   const [progress, setProgress] = useState(0);
   const [processingStage, setProcessingStage] = useState("");
   const [estimatedTimeLeft, setEstimatedTimeLeft] = useState(null);
   const processingStartTime = useRef(null);
-  const [refreshCanvas, setRefreshCanvas] = useState(0); // State to trigger canvas refresh
+  const [refreshCanvas, setRefreshCanvas] = useState(0);
   const videoCanvasRef = useRef(null);
 
-  // Get detections and related data from useDetections hook
   const {
     detections,
     originalWidth,
@@ -57,7 +59,6 @@ const JobCard = ({ job, setJobs }) => {
     heatmapVideoUrl,
   } = useDetections(taskID);
 
-  // Timer effect
   useEffect(() => {
     if (isProcessing && !processingStartTime.current) {
       processingStartTime.current = new Date();
@@ -67,12 +68,11 @@ const JobCard = ({ job, setJobs }) => {
     }
   }, [isProcessing]);
 
-  // Poll task status
   useEffect(() => {
     if (!taskID || !isProcessing) return;
 
     let intervalId;
-    const pollInterval = 1000; // Poll every second for smoother updates
+    const pollInterval = 1000;
 
     const pollTaskStatus = async () => {
       try {
@@ -81,13 +81,11 @@ const JobCard = ({ job, setJobs }) => {
         );
         const { state, status } = response.data;
 
-        // Extract progress percentage and status message
         if (status) {
           if (status.percent !== undefined) {
-            // Ensure the progress value is a number and update state
             const progressValue = parseFloat(status.percent);
             if (!isNaN(progressValue)) {
-              setProgress(progressValue); // Update progress state
+              setProgress(progressValue);
             }
           }
 
@@ -96,7 +94,6 @@ const JobCard = ({ job, setJobs }) => {
           }
         }
 
-        // Calculate estimated time remaining
         if (processingStartTime.current && status && status.percent > 0) {
           const elapsedMs = new Date() - processingStartTime.current;
           const totalEstimatedMs = (elapsedMs * 100) / status.percent;
@@ -114,7 +111,6 @@ const JobCard = ({ job, setJobs }) => {
           }
         }
 
-        // Handle task completion states
         if (state === "SUCCESS" || state === "FAILURE" || state === "REVOKED") {
           clearInterval(intervalId);
 
@@ -132,10 +128,8 @@ const JobCard = ({ job, setJobs }) => {
       }
     };
 
-    // Initial poll
     pollTaskStatus();
 
-    // Set up polling at fixed interval
     intervalId = setInterval(pollTaskStatus, pollInterval);
 
     return () => {
@@ -145,69 +139,101 @@ const JobCard = ({ job, setJobs }) => {
     };
   }, [taskID, isProcessing]);
 
-  // Class colors effect
   useEffect(() => {
     if (detections && detections.length > 0) {
-      updateClassColors(detections, job, setJobs);
+      const uniqueClasses = new Set();
+      detections.flat().forEach((detection) => {
+        if (detection.class_name) {
+          uniqueClasses.add(detection.class_name);
+        }
+      });
+
+      let needsUpdate = false;
+      const updatedClassColors = { ...job.classColors };
+
+      Array.from(uniqueClasses).forEach((className) => {
+        if (!updatedClassColors[className]) {
+          const existingHues = Object.values(updatedClassColors).map(
+            (c) => c.hue
+          );
+          const newColor = getDistinctColor(existingHues);
+          updatedClassColors[className] = newColor;
+          needsUpdate = true;
+        }
+        if (updatedClassColors[className].hex.startsWith("hsl")) {
+          const hue = updatedClassColors[className].hue;
+          updatedClassColors[className].hex = hslToHex(hue, 70, 50);
+          needsUpdate = true;
+        }
+      });
+
+      if (needsUpdate) {
+        updateJob(job.id, { classColors: updatedClassColors });
+      }
     }
-  }, [detections, job, setJobs]);
+  }, [detections, job.id]);
 
   const handleRemoveJob = () => {
     if (taskID) {
       handleReset();
     }
-    setJobs((prevJobs) => prevJobs.filter((j) => j.id !== job.id));
+    removeJob(job.id);
   };
 
-  const toggleHeatmapView = () => {
+  const handleToggleHeatmapView = () => {
     console.log(
       `Toggling heatmap view. Current state: ${
         job.showHeatmap ? "Showing heatmap" : "Showing detections"
       }`
     );
-    console.log(`Heatmap video URL: ${heatmapVideoUrl}`);
 
-    setJobs((prevJobs) =>
-      prevJobs.map((j) => {
-        if (j.id === job.id) {
-          const newState = !j.showHeatmap;
-          console.log(`Setting job ${j.id} showHeatmap to ${newState}`);
-          return { ...j, showHeatmap: newState };
-        }
-        return j;
-      })
-    );
+    toggleHeatmapView(job.id);
   };
 
-  // Notification effect for heatmap data
   useEffect(() => {
-    showHeatmapNotification(hasHeatmapData, heatmapFrames, job, setJobs);
-  }, [hasHeatmapData, heatmapFrames, job, setJobs]);
-
-  // Update job when new heatmap frames are available
-  useEffect(() => {
-    if (heatmapFrames && heatmapFrames.length > 0) {
-      setJobs((prevJobs) =>
-        prevJobs.map((j) =>
-          j.id === job.id ? { ...j, heatmapFrames: heatmapFrames } : j
-        )
-      );
+    if (
+      hasHeatmapData &&
+      heatmapFrames &&
+      heatmapFrames.length > 0 &&
+      !job.heatmapNotified
+    ) {
+      updateJob(job.id, {
+        heatmapFrames,
+        heatmapNotified: true,
+      });
     }
-  }, [heatmapFrames, job.id, setJobs]);
+  }, [hasHeatmapData, heatmapFrames, job.id, job.heatmapNotified, updateJob]);
 
-  // Function to refresh the canvas when colors change
+  const [viewportSize, setViewportSize] = useState("desktop");
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width < 640) {
+        setViewportSize("mobile");
+      } else if (width < 1024) {
+        setViewportSize("tablet");
+      } else {
+        setViewportSize("desktop");
+      }
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const handleRefreshCanvas = () => {
     setRefreshCanvas((prev) => prev + 1);
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-      {/* Job Header */}
+    <div className="bg-white rounded-lg shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg">
       <JobHeader job={job} onRemove={handleRemoveJob} />
 
-      {/* Processing Controls & Progress */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex flex-wrap items-center gap-4">
+      {/* Processing Controls & Progress - make more compact */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="flex flex-wrap items-center gap-3 mb-3">
           <ProcessingControls
             onStartProcessing={() =>
               handleStartProcessing(
@@ -224,21 +250,20 @@ const JobCard = ({ job, setJobs }) => {
             hasVideoUploaded={true}
           />
 
-          {/* Task ID display */}
           {taskID && (
-            <div className="bg-gray-100 px-3 py-1 rounded-lg text-sm text-gray-700 flex items-center">
-              <IdCard className="h-4 w-4 mr-1" />
-              <span className="font-mono">Task ID: {taskID}</span>
+            <div className="bg-gray-100 px-2 py-1 rounded-lg text-xs text-gray-700 flex items-center">
+              <IdCard className="h-3 w-3 mr-1" />
+              <span className="font-mono text-xs">
+                Task: {taskID.substring(0, 8)}...
+              </span>
             </div>
           )}
 
-          {/* Status indicator */}
           {isProcessing && (
             <StatusIndicator processingStage={processingStage} />
           )}
         </div>
 
-        {/* Progress Bar Component */}
         {isProcessing && (
           <ProgressBar
             progress={progress}
@@ -248,18 +273,17 @@ const JobCard = ({ job, setJobs }) => {
           />
         )}
 
-        {/* View Mode Selector */}
         {(hasHeatmapData || processingWithHeatmap) &&
           heatmapFrames &&
           heatmapFrames.length > 0 && (
             <ViewModeSelector
               jobShowHeatmap={job.showHeatmap}
-              toggleHeatmapView={toggleHeatmapView}
+              toggleHeatmapView={handleToggleHeatmapView}
             />
           )}
       </div>
 
-      {/* Conditional rendering based on view mode */}
+      {/* Conditional rendering based on view mode - more compact layout */}
       {job.showHeatmap ? (
         <HeatmapViewSection
           taskID={taskID}
@@ -292,7 +316,6 @@ const JobCard = ({ job, setJobs }) => {
   );
 };
 
-// Helper functions and sub-components
 const updateClassColors = (detections, job, setJobs) => {
   const detectedClasses = new Set(
     detections.flat().map((det) => det.class_name)
@@ -357,8 +380,7 @@ const StatusIndicator = ({ processingStage }) => (
   </div>
 );
 
-// View mode selector with toggle switch
-const ViewModeSelector = ({ jobShowHeatmap, toggleHeatmapView }) => (
+const ViewModeSelector = React.memo(({ jobShowHeatmap, toggleHeatmapView }) => (
   <div className="mt-6 border border-gray-200 rounded-lg bg-gray-50 p-5 shadow-sm">
     <h3 className="text-md font-medium text-gray-800 mb-4 flex items-center">
       <EyeIcon className="mr-2 h-5 w-5 text-blue-600" />
@@ -367,11 +389,14 @@ const ViewModeSelector = ({ jobShowHeatmap, toggleHeatmapView }) => (
 
     <div className="flex items-center justify-center max-w-md mx-auto">
       <div
-        className={`flex-1 flex items-center justify-center px-2 py-3 rounded-l-lg transition-all ${
+        className={`flex-1 flex items-center justify-center px-4 py-3 rounded-l-lg transition-all ${
           !jobShowHeatmap
             ? "bg-blue-100 text-blue-700 font-medium border-2 border-blue-300"
             : "bg-gray-100 text-gray-600"
         }`}
+        onClick={() => jobShowHeatmap && toggleHeatmapView()}
+        role="button"
+        tabIndex={0}
       >
         <VideoIcon className="h-5 w-5 mr-2" />
         <span>Object Detection</span>
@@ -384,13 +409,7 @@ const ViewModeSelector = ({ jobShowHeatmap, toggleHeatmapView }) => (
           checked={jobShowHeatmap}
           onChange={toggleHeatmapView}
         />
-        <div
-          className="w-12 h-6 bg-gray-300 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 
-                        peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] 
-                        after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 
-                        after:border after:rounded-full after:h-5 after:w-5 after:transition-all 
-                        peer-checked:bg-blue-600"
-        ></div>
+        <div className="w-12 h-6 bg-gray-300 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
       </label>
 
       <div
@@ -399,15 +418,17 @@ const ViewModeSelector = ({ jobShowHeatmap, toggleHeatmapView }) => (
             ? "bg-blue-100 text-blue-700 font-medium border-2 border-blue-300"
             : "bg-gray-100 text-gray-600"
         }`}
+        onClick={() => !jobShowHeatmap && toggleHeatmapView()}
+        role="button"
+        tabIndex={0}
       >
         <Activity className="h-5 w-5 mr-2" />
         <span>Heatmap View</span>
       </div>
     </div>
   </div>
-);
+));
 
-// Object Detection view content
 const ObjectDetectionViewSection = ({
   job,
   detections,
@@ -422,7 +443,6 @@ const ObjectDetectionViewSection = ({
   taskID,
 }) => (
   <div className="border-t border-gray-200 bg-gray-50">
-    {/* Class Colors Section */}
     {detections && detections.length > 0 && (
       <div className="p-6 border-b border-gray-200 bg-white">
         <div className="flex items-center justify-between mb-4">
@@ -451,7 +471,6 @@ const ObjectDetectionViewSection = ({
       </div>
     )}
 
-    {/* Video Canvas Section */}
     <div className="p-6 border-b border-gray-200 bg-white">
       <div className="flex items-center mb-4">
         <div className="bg-blue-100 p-2 rounded-md mr-3">
@@ -475,7 +494,6 @@ const ObjectDetectionViewSection = ({
       />
     </div>
 
-    {/* Detection Statistics Section */}
     {taskID && detections && detections.length > 0 && (
       <div className="p-6 bg-white">
         <div className="flex items-center mb-4">
@@ -493,7 +511,6 @@ const ObjectDetectionViewSection = ({
   </div>
 );
 
-// Heatmap view content
 const HeatmapViewSection = ({
   taskID,
   job,
@@ -502,7 +519,6 @@ const HeatmapViewSection = ({
   heatmapAnalysis,
 }) => (
   <div className="border-t border-gray-200 bg-gray-50">
-    {/* Heatmap Analysis Section */}
     <div className="p-6 border-b border-gray-200 bg-white">
       <div className="flex items-center mb-4">
         <div className="bg-green-100 p-2 rounded-md mr-3">
@@ -514,7 +530,6 @@ const HeatmapViewSection = ({
       <HeatmapAnalysis heatmapData={heatmapAnalysis || {}} taskID={taskID} />
     </div>
 
-    {/* Heatmap Video Section */}
     <div className="p-6 border-b border-gray-200 bg-white">
       <div className="flex items-center mb-4">
         <div className="bg-green-100 p-2 rounded-md mr-3">
@@ -532,7 +547,6 @@ const HeatmapViewSection = ({
       )}
     </div>
 
-    {/* Download Section */}
     {taskID && (
       <div className="p-6 bg-white">
         <div className="flex items-center mb-4">
