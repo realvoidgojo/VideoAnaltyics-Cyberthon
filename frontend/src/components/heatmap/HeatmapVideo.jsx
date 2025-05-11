@@ -39,6 +39,7 @@ const HeatmapVideo = ({ taskID, containerWidth, visible }) => {
 
     fetchVideoInfo();
 
+    // Clean up existing player if it exists
     return () => {
       if (playerRef.current) {
         playerRef.current.dispose();
@@ -46,24 +47,20 @@ const HeatmapVideo = ({ taskID, containerWidth, visible }) => {
         setIsPlayerReady(false);
       }
     };
-  }, [taskID, visible]);
+  }, [taskID]); // Only depend on taskID, not visible
 
+  // Separate effect for player initialization
   useEffect(() => {
     if (!videoInfo || !visible || !videoRef.current) return;
 
-    // Make sure DOM is fully rendered before initializing player
-    const timer = setTimeout(() => {
-      initializePlayer();
-    }, 100);
+    // Only initialize if we don't have a player yet
+    if (!playerRef.current) {
+      const timer = setTimeout(() => {
+        initializePlayer();
+      }, 100);
 
-    return () => {
-      clearTimeout(timer);
-      if (playerRef.current) {
-        playerRef.current.dispose();
-        playerRef.current = null;
-        setIsPlayerReady(false);
-      }
-    };
+      return () => clearTimeout(timer);
+    }
   }, [videoInfo, visible]);
 
   const initializePlayer = () => {
@@ -161,19 +158,19 @@ const HeatmapVideo = ({ taskID, containerWidth, visible }) => {
   if (!visible) return null;
 
   return (
-    <div className="video-container relative space-y-4 w-full">
-      <div className="w-full max-w-full mx-auto bg-gray-50 rounded-lg p-4 shadow-md">
+    <div className="video-container relative w-full">
+      <div className="w-full max-w-full mx-auto bg-gray-50 rounded-lg p-3 shadow-md">
         {isLoading && (
           <div className="absolute inset-0 flex justify-center items-center bg-gray-800 bg-opacity-70 rounded-lg z-10">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
-            <span className="ml-3 text-white">Loading heatmap video...</span>
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500" />
+            <span className="ml-3 text-white">Loading heatmap...</span>
           </div>
         )}
 
         {videoError && (
-          <div className="p-4 bg-red-100 text-red-700 rounded-lg">
-            <h3 className="font-bold">Error Loading Heatmap Video</h3>
-            <p>{errorDetails}</p>
+          <div className="p-3 bg-red-100 text-red-700 rounded-lg mb-3">
+            <h3 className="font-bold">Error Loading Heatmap</h3>
+            <p className="text-sm">{errorDetails}</p>
           </div>
         )}
 
@@ -185,15 +182,15 @@ const HeatmapVideo = ({ taskID, containerWidth, visible }) => {
           />
         </div>
 
-        {/* External Player Button - Always visible when video info is available */}
+        {/* External Player Button - More compact */}
         {videoInfo && (
-          <div className="mt-4 flex justify-start">
+          <div className="mt-3 flex justify-start">
             <button
               onClick={openInExternalPlayer}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+              className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1 shadow-sm text-sm"
             >
-              <ArrowUpRightFromSquare className="h-5 w-5" />
-              Open in External Player
+              <ArrowUpRightFromSquare className="h-4 w-4" />
+              External Player
             </button>
           </div>
         )}

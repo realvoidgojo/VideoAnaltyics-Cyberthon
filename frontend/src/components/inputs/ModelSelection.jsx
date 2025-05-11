@@ -1,30 +1,31 @@
 // ModelSelection.jsx
 import React from "react";
+import PropTypes from "prop-types";
+import Select from "../ui/Select";
 
 const ModelSelection = ({ selectedModel, onModelChange }) => {
+  const modelOptions = [
+    { value: "yolov11n.pt", label: "YOLOv11n (Fastest)" },
+    { value: "yolov11s.pt", label: "YOLOv11s (Small)" },
+    { value: "yolov11m.pt", label: "YOLOv11m (Medium)" },
+    { value: "yolov11l.pt", label: "YOLOv11l (Large)" },
+    { value: "yolov11x.pt", label: "YOLOv11x (Extra Large)" },
+  ];
+
   return (
-    <select
+    <Select
       value={selectedModel}
       onChange={onModelChange}
-      className=" text-gray-900 border border-gray-300 p-2 m-4 rounded-lg"
-    >
-      <option value="yolov11n.pt" className="bg-gray-00">
-        YOLOv11n
-      </option>
-      <option value="yolov11s.pt" className="bg-gray-600">
-        YOLOv11s
-      </option>
-      <option value="yolov11m.pt" className="bg-gray-600">
-        YOLOv11m
-      </option>
-      <option value="yolov11l.pt" className="bg-gray-600">
-        YOLOv11l
-      </option>
-      <option value="yolov11x.pt" className="bg-gray-600">
-        YOLOv11x
-      </option>
-    </select>
+      options={modelOptions}
+      label="Model"
+      helperText="Select model size based on performance needs"
+    />
   );
+};
+
+ModelSelection.propTypes = {
+  selectedModel: PropTypes.string.isRequired,
+  onModelChange: PropTypes.func.isRequired,
 };
 
 export default ModelSelection;
