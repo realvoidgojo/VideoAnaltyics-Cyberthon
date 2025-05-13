@@ -3,10 +3,11 @@ from celery import Celery
 from celery.schedules import crontab
 from . import video_processing, object_detection  # Import your modules
 
+# Update the include list to ensure all tasks are included
 celery_app = Celery('video_processing',
-                    broker='redis://localhost:6379/0',  # Replace with your Redis URL if needed
+                    broker='redis://localhost:6379/0',
                     backend='redis://localhost:6379/0',
-                    include=['src.video_processing_tasks'])  # List of modules with Celery tasks
+                    include=['src.video_processing_tasks'])  # This list should include all modules with tasks
 
 celery_app.config_from_object('src.celeryconfig')
 # Example periodic task (optional):

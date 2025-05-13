@@ -5,7 +5,9 @@ import os
 import logging
 import tempfile
 import re  # Add this for regex support with range requests
-from src.video_processing_tasks import process_video_task
+from uuid import uuid4
+from src.video_processing_tasks import process_video_task, server_side_process_video_task
+from src.server_rendering import VideoRenderEngine
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -23,6 +25,10 @@ if not os.path.exists(HLS_FOLDER):
     logger.info(f"Created HLS folder at {HLS_FOLDER}")
 else:
     logger.info(f"HLS folder exists at {HLS_FOLDER}")
+
+# Create HLS stream directory if it doesn't exist
+with app.app_context():
+    os.makedirs('hls_stream', exist_ok=True)
 
 # Serve React frontend
 @app.route("/")
@@ -98,37 +104,47 @@ def resume_processing():
     """Not implemented"""
     return jsonify({'message': 'Not implemented'})
 
+# Update the download_heatmap_video endpoint to handle both task types
+
 @app.route('/download_heatmap_video/<task_id>', methods=['GET'])
 def download_heatmap_video(task_id):
     """Returns the heatmap video for a completed task."""
-    task = process_video_task.AsyncResult(task_id)
-    
-    # Allow both SUCCESS and PROGRESS states
-    if task.state not in ['SUCCESS', 'PROGRESS']:
-        return jsonify({'error': 'Heatmap video not available for this task'}), 404
-    
-    # Get the heatmap video path from the task result
-    result = task.info
-    if not result or not isinstance(result, dict) or 'heatmap_video_path' not in result:
-        return jsonify({'error': 'Heatmap video path not found in task result'}), 404
-    
-    heatmap_video_path = result['heatmap_video_path']
-    
-    if not heatmap_video_path:
-        return jsonify({'error': 'Heatmap video path is null'}), 404
-    
-    if not os.path.exists(heatmap_video_path):
-        return jsonify({'error': f'Heatmap video file not found at {heatmap_video_path}'}), 404
-    
-    # Get the correct mimetype based on file extension
-    mimetype = 'video/x-msvideo' if heatmap_video_path.endswith('.avi') else 'video/mp4'
-    extension = '.avi' if heatmap_video_path.endswith('.avi') else '.mp4'
-    
-    # Return the video file
-    return send_file(heatmap_video_path, 
-                    mimetype=mimetype,
-                    as_attachment=True,
-                    download_name=f"heatmap_{task_id}{extension}")
+    try:
+        # Try both task types since we have both client-side and server-side processing
+        for task_func in [server_side_process_video_task, process_video_task]:
+            task = task_func.AsyncResult(task_id)
+            
+            if task.state in ['SUCCESS', 'PROGRESS'] and task.info:
+                result = task.info
+                
+                if 'heatmap_video_path' in result and result['heatmap_video_path']:
+                    heatmap_video_path = result['heatmap_video_path']
+                    
+                    if not os.path.exists(heatmap_video_path):
+                        continue  # Try the other task type
+                        
+                    # Get the correct mimetype based on file extension
+                    mimetype = 'video/mp4'
+                    extension = '.mp4'
+                    if heatmap_video_path.endswith('.avi'):
+                        mimetype = 'video/x-msvideo'
+                        extension = '.avi'
+                    
+                    # Return the video file
+                    app.logger.info(f"Serving heatmap video for download: {heatmap_video_path}")
+                    return send_file(
+                        heatmap_video_path, 
+                        mimetype=mimetype,
+                        as_attachment=True,
+                        download_name=f"heatmap_{task_id}{extension}"
+                    )
+        
+        # If we get here, no valid heatmap video was found
+        return jsonify({'error': 'No heatmap video found for this task'}), 404
+        
+    except Exception as e:
+        app.logger.error(f"Error downloading heatmap video: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Error downloading video: {str(e)}'}), 500
 
 @app.route('/stream_heatmap_video/<task_id>', methods=['GET'])
 def stream_heatmap_video(task_id):
@@ -301,64 +317,118 @@ def get_heatmap_video_info(task_id):
         app.logger.error(f"Error getting heatmap video info: {str(e)}", exc_info=True)
         return jsonify({'error': f'Error getting video info: {str(e)}'}), 500
 
-@app.route('/hls_stream/<task_id>/<path:filename>', methods=['GET'])
-def serve_hls_file(task_id, filename):
-    """Serves HLS stream files for a task."""
+@app.route('/hls_stream/<task_id>/<path:filename>')
+def serve_hls_stream(task_id, filename):
+    """Serve HLS stream files"""
+    stream_dir = os.path.join('hls_stream', task_id)
+    if not os.path.exists(stream_dir):
+        return jsonify({'error': f'HLS stream directory not found for task {task_id}'}), 404
+        
+    file_path = os.path.join(stream_dir, filename)
+    if not os.path.exists(file_path):
+        return jsonify({'error': f'HLS file not found: {filename}'}), 404
+    
+    # Set content type based on file extension
+    content_type = 'application/vnd.apple.mpegurl'  # Default for .m3u8 files
+    if filename.endswith('.ts'):
+        content_type = 'video/mp2t'
+    
+    # Add cache control and CORS headers
+    response = send_file(file_path, mimetype=content_type)
+    response.headers.add('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+    response.headers.add('Pragma', 'no-cache')
+    response.headers.add('Expires', '0')
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+    
+    return response
+
+# Add a route to serve heatmap HLS streams
+
+@app.route('/hls_stream/<task_id>/heatmap_hls/<path:filename>')
+def serve_heatmap_hls_stream(task_id, filename):
+    """Serve heatmap HLS stream files"""
+    stream_dir = os.path.join('hls_stream', task_id, 'heatmap_hls')
+    if not os.path.exists(stream_dir):
+        return jsonify({'error': f'Heatmap HLS stream directory not found for task {task_id}'}), 404
+        
+    file_path = os.path.join(stream_dir, filename)
+    if not os.path.exists(file_path):
+        return jsonify({'error': f'Heatmap HLS file not found: {filename}'}), 404
+    
+    # Set content type based on file extension
+    content_type = 'application/vnd.apple.mpegurl'  # Default for .m3u8 files
+    if filename.endswith('.ts'):
+        content_type = 'video/mp2t'
+    
+    # Add cache control and CORS headers
+    response = send_file(file_path, mimetype=content_type)
+    response.headers.add('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+    response.headers.add('Pragma', 'no-cache')
+    
+    return response
+
+@app.route('/hls_stream/<task_id>/heatmap_hls/<path:filename>')
+def serve_heatmap_hls_files(task_id, filename):
+    """Serve heatmap HLS files"""
     try:
-        task = process_video_task.AsyncResult(task_id)
-        
-        # Allow both SUCCESS and PROGRESS states
-        if task.state not in ['SUCCESS', 'PROGRESS']:
-            app.logger.error(f"Task {task_id} is in state {task.state}, not SUCCESS or PROGRESS")
-            return jsonify({'error': 'HLS stream not available for this task'}), 404
-        
-        # Get the HLS manifest path from the task result
-        result = task.info
-        if not result or not isinstance(result, dict) or 'heatmap_analysis' not in result:
-            app.logger.error(f"Heatmap analysis not found in task result: {result.keys() if result and isinstance(result, dict) else 'N/A'}")
-            return jsonify({'error': 'Heatmap analysis not found in task result'}), 404
-        
-        heatmap_analysis = result['heatmap_analysis']
-        if not heatmap_analysis or 'hls_manifest_path' not in heatmap_analysis:
-            app.logger.error(f"HLS manifest path not found in heatmap analysis: {heatmap_analysis.keys() if heatmap_analysis and isinstance(heatmap_analysis, dict) else 'N/A'}")
-            return jsonify({'error': 'HLS manifest path not found in task result'}), 404
-        
-        hls_manifest_path = heatmap_analysis['hls_manifest_path']
-        if not hls_manifest_path:
-            app.logger.error("HLS manifest path is null")
-            return jsonify({'error': 'HLS manifest path is null'}), 404
-        
-        # Get the directory containing the HLS files
-        hls_dir = os.path.dirname(hls_manifest_path)
-        
-        # Construct the full path to the requested file
+        hls_dir = os.path.join('hls_stream', task_id, 'heatmap_hls')
+        if not os.path.exists(hls_dir):
+            app.logger.error(f"Heatmap HLS directory not found: {hls_dir}")
+            return jsonify({'error': f'HLS directory not found for task {task_id}'}), 404
+            
         file_path = os.path.join(hls_dir, filename)
-        
         if not os.path.exists(file_path):
             app.logger.error(f"HLS file not found: {file_path}")
             return jsonify({'error': f'HLS file not found: {filename}'}), 404
         
-        # Set the appropriate content type based on file extension
-        content_type = 'application/vnd.apple.mpegurl'
-        if file_path.endswith('.ts'):
+        # Set content type based on file extension
+        content_type = 'application/vnd.apple.mpegurl'  # Default for .m3u8 files
+        if filename.endswith('.ts'):
             content_type = 'video/mp2t'
-        
-        app.logger.info(f"Serving HLS file: {file_path} with content type: {content_type}")
         
         # Add cache control headers to prevent caching issues
         response = send_file(file_path, mimetype=content_type)
-        response.headers.add('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        response.headers.add('Cache-Control', 'no-cache, no-store, must-revalidate')
         response.headers.add('Pragma', 'no-cache')
         response.headers.add('Expires', '0')
-        # Add CORS headers
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
         return response
         
     except Exception as e:
         app.logger.error(f"Error serving HLS file: {str(e)}", exc_info=True)
         return jsonify({'error': f'Error serving HLS file: {str(e)}'}), 500
+
+@app.route('/get_heatmap_hls_info/<task_id>', methods=['GET'])
+def get_heatmap_hls_info(task_id):
+    """Get information about the heatmap HLS stream"""
+    try:
+        # Try both task types
+        for task_func in [server_side_process_video_task, process_video_task]:
+            task = task_func.AsyncResult(task_id)
+            
+            if task.state == 'SUCCESS' and task.info:
+                result = task.info
+                
+                # Check if heatmap_hls_url exists
+                if 'heatmap_hls_url' in result:
+                    return jsonify({
+                        'hls_url': result['heatmap_hls_url'],
+                        'use_heatmap': result.get('use_heatmap', False)
+                    })
+                
+                # Check if we have a heatmap_video_path that could be converted
+                if 'heatmap_video_path' in result and os.path.exists(result['heatmap_video_path']):
+                    return jsonify({
+                        'stream_url': f'/stream_heatmap_video/{task_id}',
+                        'mime_type': 'video/mp4',
+                    })
+        
+        return jsonify({'error': 'Heatmap HLS stream not found'}), 404
+        
+    except Exception as e:
+        app.logger.error(f"Error getting heatmap HLS info: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Error getting heatmap HLS info: {str(e)}'}), 500
 
 @app.route('/process_video', methods=['POST'])
 def process_video():
@@ -409,6 +479,155 @@ def process_video():
     except Exception as e:
         app.logger.error(f"Error processing video: {str(e)}", exc_info=True)
         return jsonify({'error': f'Error processing video: {str(e)}'}), 500
+
+@app.route('/process_video_server_side', methods=['POST'])
+def process_video_server_side():
+    """Process video with server-side rendering and return HLS stream URL"""
+    if 'video' not in request.files:
+        return jsonify({'error': 'No video file uploaded'}), 400
+    
+    video_file = request.files['video']
+    if video_file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    # Get parameters
+    model_name = request.form.get('model', 'yolov11s.pt')
+    frame_interval = int(request.form.get('interval', 5))
+    use_heatmap = request.form.get('use_heatmap', 'false').lower() == 'true'
+    
+    # Generate unique ID for this processing task
+    task_id = str(uuid4())
+    
+    # Create task directory
+    task_dir = os.path.join('hls_stream', task_id)
+    os.makedirs(task_dir, exist_ok=True)
+    
+    # Save uploaded video
+    video_path = os.path.join(task_dir, 'input.mp4')
+    video_file.save(video_path)
+    
+    app.logger.info(f"Starting server-side processing task for video {video_path}")
+    
+    # Start the task
+    task = server_side_process_video_task.apply_async(
+        args=[video_path, task_dir, model_name, frame_interval, use_heatmap]
+    )
+    
+    # Return task ID and stream URL
+    return jsonify({
+        'task_id': task.id,
+        'stream_url': f'/hls_stream/{task_id}/stream.m3u8',
+        'status': 'processing'
+    }), 202
+
+@app.route('/get_server_side_status/<task_id>', methods=['GET'])
+def get_server_side_status(task_id):
+    """Get status of server-side video processing"""
+    from src.video_processing_tasks import server_side_process_video_task
+    
+    task = server_side_process_video_task.AsyncResult(task_id)
+    
+    if task.state == 'PENDING':
+        response = {
+            'state': task.state,
+            'status': 'Pending...'
+        }
+    elif task.state == 'PROGRESS':
+        response = {
+            'state': task.state,
+            'status': task.info.get('status', 'Processing...')
+        }
+    elif task.state == 'SUCCESS':
+        response = {
+            'state': task.state,
+            'status': task.info
+        }
+    elif task.state == 'FAILURE':
+        response = {
+            'state': task.state,
+            'status': str(task.info)  # exception message
+        }
+    else:
+        response = {
+            'state': task.state,
+            'status': 'Unknown state'
+        }
+    
+    return jsonify(response)
+
+@app.route('/get_detection_statistics/<task_id>', methods=['GET'])
+def get_detection_statistics(task_id):
+    """Get object detection statistics for a task"""
+    try:
+        task = server_side_process_video_task.AsyncResult(task_id)
+        
+        if task.state != 'SUCCESS':
+            return jsonify({'error': 'Task is not yet complete'}), 404
+            
+        result = task.info
+        if not result or not isinstance(result, dict):
+            return jsonify({'error': 'Invalid task result'}), 500
+            
+        # Extract statistics
+        stats = {
+            'object_frequency': result.get('object_frequency', {}),
+            'unique_object_count': result.get('unique_object_count', 0),
+            'total_frames': result.get('total_frames', 0),
+            'processed_frames': result.get('processed_frames', 0)
+        }
+        
+        return jsonify(stats)
+    except Exception as e:
+        app.logger.error(f"Error getting detection statistics: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Error getting statistics: {str(e)}'}), 500
+
+@app.route('/get_heatmap_analysis/<task_id>', methods=['GET'])
+def get_heatmap_analysis(task_id):
+    """Gets heatmap analysis data for a completed task"""
+    try:
+        from src.video_processing_tasks import server_side_process_video_task, process_video_task
+        
+        # Try both task types
+        for task_func in [server_side_process_video_task, process_video_task]:
+            task = task_func.AsyncResult(task_id)
+            
+            if task.state == 'SUCCESS' and task.info:
+                result = task.info
+                
+                # Extract heatmap analysis data
+                heatmap_analysis = {}
+                
+                # Check if heatmap analysis exists directly
+                if 'heatmap_analysis' in result and isinstance(result['heatmap_analysis'], dict):
+                    app.logger.info(f"Found heatmap analysis in task result: {result['heatmap_analysis']}")
+                    return jsonify(result['heatmap_analysis'])
+                    
+                # Fall back to object_frequency for movement patterns
+                elif 'object_frequency' in result:
+                    app.logger.info(f"Generating heatmap analysis from object frequency")
+                    total_objects = sum(result['object_frequency'].values()) if result['object_frequency'] else 0
+                    
+                    heatmap_analysis = {
+                        'peak_movement_time': 0,
+                        'average_intensity': total_objects / max(1, len(result['object_frequency'])) if result['object_frequency'] else 0,
+                        'movement_duration': result.get('processed_frames', 0) / result.get('fps', 30) if result.get('fps', 0) > 0 else 0,
+                        'total_duration': result.get('total_frames', 0) / result.get('fps', 30) if result.get('fps', 0) > 0 else 0,
+                    }
+                    
+                    return jsonify(heatmap_analysis)
+        
+        # If no task contains heatmap data
+        app.logger.warning(f"No heatmap data found for task {task_id}")
+        return jsonify({
+            'peak_movement_time': 0,
+            'average_intensity': 0,
+            'movement_duration': 0,
+            'total_duration': 0
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error getting heatmap analysis: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Error getting heatmap analysis: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,187 +1,239 @@
-# Video Analytics and OSINT Project
+# 🔍 Video Analytics and OSINT Platform
 
-This project demonstrates real-time object detection in videos using a React frontend and a Flask backend. It utilizes the YOLO model for object detection, Celery for asynchronous task management, and Redis for message brokering. The application includes features for video analysis, heatmap generation, and object tracking.
+![Video Analytics](https://img.shields.io/badge/Video-Analytics-blue)
+![Object Detection](https://img.shields.io/badge/Object-Detection-green)
+![Heatmap Analysis](https://img.shields.io/badge/Heatmap-Analysis-red)
+![React](https://img.shields.io/badge/React-Frontend-61DBFB)
+![Flask](https://img.shields.io/badge/Flask-Backend-lightgrey)
 
-## Features
+A comprehensive video analytics platform with real-time object detection, movement heatmap analysis, and object tracking capabilities. Powered by YOLO models for detection, with a React frontend and Flask+Celery backend.
 
-- **Real-time Object Detection**: Process videos and detect objects using YOLO models
-- **Heatmap Analysis**: Generate motion heatmaps to visualize movement patterns
-- **Object Tracking**: Track objects across video frames
-- **Statistical Analysis**: View frequency charts and statistics about detected objects
-- **Multiple Video Processing**: Process multiple videos simultaneously with job management
-- **Customizable Detection Parameters**: Adjust frame intervals and model selection
+## ✨ Features
 
-## Prerequisites , checkout [setup](./setup/readme.md)
+- **📊 Real-time Object Detection**: Process videos and detect objects using latest YOLO models
+- **🔥 Heatmap Analysis**: Generate motion heatmaps to visualize movement patterns over time
+- **📈 Statistical Analysis**: Visualize detected object frequencies and detailed statistics
+- **🔄 Object Tracking**: Track objects across video frames with persistence
+- **⚡ Multiple Video Processing**: Process multiple videos simultaneously with intuitive job management
+- **🛠️ Customizable Parameters**: Adjust frame intervals and model selection for optimal results
+- **📱 Responsive UI**: Modern interface that works across devices
 
-Before you begin, ensure that you have the following installed:
+## 🛠️ Prerequisites
+
+Before getting started, ensure you have installed:
 
 - **Python 3.12**
-- **Node.js and npm**
-- **Git** (for cloning the repository)
-- **Redis** (for Celery message broker and result backend)
+- **[Node.js & npm](https://nodejs.org/en/download)**
+- **[Git](https://git-scm.com/downloads)** (with [Git LFS](https://git-lfs.com/))
+- **Redis** (Celery message broker and result backend)
   - **Windows:** [Download Redis for Windows](https://github.com/tporadowski/redis/releases)
   - **Ubuntu:** `sudo apt update && sudo apt install redis-server`
+- **[Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install#quickstart-install-instructions)** (recommended)
 
-### GPU Acceleration (Optional but Recommended)
+### 🚀 Optional: GPU Acceleration
 
-- **CUDA Toolkit:** Version 11.6 or higher (check compatibility with PyTorch)
-- **cuDNN:** Version matching your CUDA Toolkit
-- **PyTorch with CUDA support**
+For significantly faster processing:
 
-## Installation
+- **CUDA Toolkit:** Version 11.6 or higher
+  - [Download CUDA Toolkit](https://developer.nvidia.com/cuda-downloads)
+- **cuDNN:** Matching your CUDA version
+  - [cuDNN Download Page](https://developer.nvidia.com/cudnn-downloads)
+- **PyTorch with CUDA:** Installed via custom index
+  - [PyTorch Installation Guide](https://pytorch.org/get-started/locally/)
 
-1. **Clone the repository:**
-   
-   First, install Git LFS extension for handling large files: [Download Git LFS](https://git-lfs.com/)
+## 🧱 Installation
 
-   ```bash
-   git clone https://github.com/realvoidgojo/VideoAnaltyics-Cyberthon.git
-   cd VideoAnaltyics-Cyberthon
-   ```
+### 1. Clone the Repository
 
-2. **Backend Setup (Flask & Celery):**
-
-   - Create a virtual environment:
-
-     ```bash
-     python -m venv venv
-     venv\Scripts\activate  # Windows
-     # OR
-     source venv/bin/activate  # Linux or macOS
-     ```
-
-   - Install the required Python packages:
-
-     ```bash
-     pip install -r requirements.txt
-     ```
-
-   - For CUDA support (optional):
-
-     ```bash
-     pip uninstall torch torchvision
-     pip install torch torchvision --index-url https://download.pytorch.org/whl/cu116  # Replace cu116 with your CUDA version
-     ```
-
-   - Download YOLO Models:
-     Download a YOLO model (e.g., `yolov11n.pt`) from the [official YOLO repository](https://github.com/ultralytics/ultralytics) or the [Ultralytics website](https://ultralytics.com/) and place it in the `models` directory.
-
-   - Set up the data directory:
-     Create an empty directory named `data` in your project root. This is where uploaded videos will be temporarily stored.
-
-3. **Frontend Setup (React + Vite):**
-
-   - Navigate to the frontend directory:
-
-     ```bash
-     cd frontend
-     ```
-
-   - Install the required Node.js packages:
-
-     ```bash
-     npm install
-     ```
-
-## Running the Application
-
-1. **Start Redis:**
-
-   - Ensure Redis server is running.
-   - For Windows, start the Redis server from the installation directory.
-
-2. **Start the Celery worker:**
-
-   - From the project's root directory, run:
-
-     ```bash
-     celery -A src.celery.celery_app worker --loglevel=info --pool=threads -c 4
-     ```
-
-   - Adjust the `-c` option (concurrency) to match the number of CPU cores you want to use.
-
-3. **Start the Flask backend:**
-
-   - From the project's root directory, run:
-
-     ```bash
-     python app.py
-     ```
-
-   - The Flask app will run on `http://127.0.0.1:5000` by default.
-
-4. **Start the React frontend:**
-
-   - From the frontend directory, run:
-
-     ```bash
-     npm run dev
-     ```
-
-   - The React app will open in your browser (usually at `http://localhost:5173`).
-
-## Performance Optimization
-
-This application has been optimized to handle large video files efficiently:
-
-- **Memory Management**: Automatic cleanup of unused resources to prevent browser crashes
-- **Request Throttling**: Intelligent polling with cooldown periods to reduce network traffic
-- **Caching**: Detection results are cached to prevent redundant fetches
-- **Exponential Backoff**: Polling frequency is reduced for completed tasks
-
-## Project Structure
-
-```
-VideoAnalytics-OSINT/
-├── app.py                   # Main Flask application file
-├── src/                     # Source code directory
-│   ├── celery.py            # Celery application definition
-│   ├── celeryconfig.py      # Celery configuration file
-│   ├── video_processing.py  # Frame extraction and preprocessing functions
-│   ├── video_processing_tasks.py  # Celery tasks for video processing
-│   ├── object_detection.py  # YOLO object detection functions
-│   ├── heatmap_analysis.py  # Heatmap generation and analysis
-├── models/                  # Directory for YOLO model (.pt file)
-├── data/                    # Directory for temporarily storing uploaded videos
-├── hls_stream/              # Directory for HLS video streaming
-├── frontend/                # React frontend
-│   ├── src/                 # React source code
-│   │   ├── components/      # React components
-│   │   │   ├── UseDetections.jsx  # Hook for fetching and managing detection data
-│   │   │   ├── VideoCanvas.jsx    # Component for displaying video with detections
-│   │   │   ├── HeatmapVideo.jsx   # Component for displaying heatmap video
-│   │   │   └── ...
-│   │   ├── pages/           # Page components
-│   │   │   └── VideoDisplay.jsx  # Main page for video display and analysis
-│   ├── public/              # Static assets
-│   ├── vite.config.js       # Vite configuration
-│   └── package.json         # Node.js dependencies
-├── requirements.txt         # Python dependencies
-└── README.md                # This file
+```bash
+git clone https://github.com/realvoidgojo/VideoAnaltyics-Cyberthon.git
+cd VideoAnaltyics-Cyberthon
 ```
 
-## Troubleshooting
+⚠️ **Important:** Download YOLO models manually from:
 
-- **Browser Crashes (SIGILL Error)**:
-  - If you experience browser crashes, it may be due to excessive network requests or memory usage.
-  - The application has been optimized to reduce these issues, but for very large videos, consider:
-    - Reducing the frame interval to process fewer frames
-    - Using a smaller model (e.g., yolov11n instead of yolov11l)
-    - Closing other browser tabs to free up memory
+- [YOLOv11 models repository](https://github.com/ultralytics/ultralytics)
+- [Ultralytics website](https://ultralytics.com/)
+- Place downloaded model(s) in the models directory
 
-- **CORS Errors**:
-  - If you encounter Cross-Origin Resource Sharing (CORS) errors, ensure that you have correctly enabled CORS in your Flask app.
+### 2. Set Up Conda Environment (Recommended)
 
-- **Model Not Found Errors**:
-  - If the YOLO model cannot be found, double-check that the path to the model file in `object_detection.py` is correct and that the model file exists in the specified location.
+```bash
+conda create -n video_env python=3.12 -y
+conda activate video_env
+conda install -c conda-forge opencv ffmpeg -y
+conda install -c conda-forge ffmpeg=6.1.1=gpl* -y
+```
+
+### 3. Backend Setup
+
+```bash
+# With conda environment activated:
+pip install -r requirements.txt
+
+# For CUDA support (optional, replace cu116 with your CUDA version):
+pip uninstall torch torchvision -y
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu116
+
+# Create necessary directories
+mkdir -p data hls_stream
+```
+
+### 4. Frontend Setup
+
+```bash
+cd frontend
+npm install
+```
+
+## ▶️ Running the Application
+
+### 1. Start Redis Server
+
+```bash
+# Windows: Start from the installed location
+# Linux/macOS:
+redis-server
+```
+
+### 2. Start Celery Worker
+
+```bash
+# From project root, in a new terminal:
+conda activate video_env  # If using conda
+celery -A src.celery.celery_app worker --loglevel=info --pool=threads -c 4
+```
+
+> Adjust `-c` option to match your CPU cores
+
+### 3. Start Flask Backend
+
+```bash
+# From project root, in a new terminal:
+conda activate video_env  # If using conda
+python app.py
+```
+
+> Flask will run at: http://127.0.0.1:5000
+
+### 4. Start React Frontend
+
+```bash
+# From frontend directory, in a new terminal:
+npm run dev
+```
+
+> Frontend will be available at: http://localhost:5173
+
+## 🖥️ Using the Application
+
+1. **Upload Videos**: Use the upload interface to submit video files
+2. **Choose Detection Settings**:
+   - Select YOLO model (smaller models are faster)
+   - Set frame interval (higher values = faster processing, fewer detections)
+   - Enable heatmap generation
+3. **Analysis Modes**:
+   - **Object Detection View**: See detected objects with bounding boxes and statistics
+   - **Heatmap Analysis**: Visualize movement intensity and patterns over time
+
+## 🌟 Features in Detail
+
+### Object Detection
+
+- Real-time object recognition with latest YOLO models
+- Customizable confidence thresholds
+- Detailed statistics of detected objects
+- Frequency charts and object counts
+- HLS video streaming for smooth playback
+
+### Heatmap Analysis
+
+- Movement intensity visualization
+- Temporal activity mapping
+- Peak movement time identification
+- Duration analysis
+- Downloadable heatmap videos
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+- **Browser Crashes or SIGILL Errors**:
+
+  - Use a smaller frame interval (process fewer frames)
+  - Select a smaller model (e.g., yolov11n instead of yolov11l)
+  - Close other browser tabs to free memory
 
 - **Video Not Playing**:
-  - If the video is not playing in the React app, make sure that the video file is a supported format and that the `videoSource` state variable is correctly set.
 
-## Contributing
+  - Check if browser supports HLS streaming
+  - Try the "External Player" option
+  - Use the direct download link instead
+
+- **Slow Processing**:
+
+  - Enable GPU acceleration if available
+  - Increase frame interval to process fewer frames
+  - Select a smaller YOLO model variant
+
+- **CORS Errors**:
+
+  - Ensure backend and frontend are running on allowed origins
+
+- **Redis Connection Issues**:
+  - Verify Redis server is running
+  - Check Redis port configuration
+
+### Performance Optimization
+
+This application includes several optimizations:
+
+- **Memory Management**: Automatic cleanup of unused resources
+- **Request Throttling**: Intelligent polling with cooldown periods
+- **Caching**: Detection results are cached to prevent redundant fetches
+- **Exponential Backoff**: Polling frequency reduces for completed tasks
+
+## 📁 Project Structure
+
+```
+VideoAnalytics-Cyberthon/
+├── app.py                   # Main Flask application
+├── src/                     # Source code directory
+│   ├── celery.py            # Celery application definition
+│   ├── video_processing.py  # Frame extraction and preprocessing
+│   ├── object_detection.py  # YOLO detection functions
+│   ├── heatmap_analysis.py  # Heatmap generation and analysis
+│   └── ...
+├── models/                  # YOLO model files (.pt)
+├── data/                    # Temporary video storage
+├── hls_stream/              # HLS video streaming files
+├── frontend/                # React frontend
+│   ├── src/                 # React source code
+│   │   ├── components/      # UI components
+│   │   │   ├── video/       # Video-related components
+│   │   │   ├── heatmap/     # Heatmap components
+│   │   │   ├── charts/      # Data visualization
+│   │   │   └── ...
+│   │   └── ...
+├── setup/                   # Setup documentation
+└── ...
+```
+
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit pull requests or open issues to suggest improvements or report bugs.
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgements
+
+- [Ultralytics](https://ultralytics.com/) for YOLO models
+- [React](https://reactjs.org/) and [Vite](https://vitejs.dev/) for the frontend framework
+- [Flask](https://flask.palletsprojects.com/) for the backend API
+- [Celery](https://docs.celeryq.dev/) for asynchronous task processing
+
+---
+
+_For detailed setup instructions, see the setup guide_

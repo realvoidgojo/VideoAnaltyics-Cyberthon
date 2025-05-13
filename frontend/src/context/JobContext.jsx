@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
+import axios from "axios";
 
 // Create the context
 const JobContext = createContext();
@@ -42,8 +43,16 @@ export const JobProvider = ({ children }) => {
     setSelectedFile(file);
   };
 
-  const saveJobPreset = () => {
+  const saveJobPreset = async (
+    selectedFile,
+    selectedModel,
+    frameInterval,
+    containerWidth,
+    useHeatmap
+  ) => {
     try {
+      setIsLoading(true);
+
       // Create a new job
       const newJob = {
         id: uuidv4(),
@@ -56,20 +65,44 @@ export const JobProvider = ({ children }) => {
         showHeatmap: false,
         heatmapNotified: false,
         classColors: {},
+        useServerRendering: true, // Always use server-side rendering
       };
+
+      // Process video using server-side rendering
+      const formData = new FormData();
+      formData.append("video", selectedFile);
+      formData.append("model", selectedModel);
+      formData.append("interval", frameInterval);
+      formData.append("use_heatmap", useHeatmap ? "true" : "false");
+
+      const response = await axios.post(
+        "/process_video_server_side",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      // Update job with task ID for server-side processing
+      newJob.serverTaskId = response.data.task_id;
+      newJob.serverStreamUrl = response.data.stream_url;
 
       // Add it to jobs list
       setJobs((prevJobs) => [newJob, ...prevJobs]);
 
       // Reset selection for next job
       setSelectedFile(null);
-      setSelectedModel("yolov11n.pt"); // Reset to default model
-      setFrameInterval(5); // Reset to default interval
-
-      // Don't call closeDialog here - the VideoUploadDialog handles closing itself
+      setSelectedModel("yolov11n.pt");
+      setFrameInterval(5);
+      setContainerWidth(720);
+      setUseHeatmap(false);
     } catch (error) {
-      console.error("Error creating job:", error);
-      setError(`Failed to create job: ${error.message}`);
+      console.error("Error processing video:", error);
+      setError("Error processing video. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 

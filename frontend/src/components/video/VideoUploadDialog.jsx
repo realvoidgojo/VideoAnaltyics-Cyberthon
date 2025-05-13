@@ -1,12 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  X,
-  Upload,
-  Sliders,
-  Box,
-  Thermometer,
-  AlertCircle,
-} from "lucide-react";
+import { X, Upload, Sliders, Thermometer, AlertCircle } from "lucide-react";
 import VideoUpload from "./VideoUpload";
 import ModelSelection from "../inputs/ModelSelection";
 import FrameIntervalInput from "../inputs/FrameIntervalInput";
@@ -14,7 +7,6 @@ import ContainerWidthInput from "../inputs/ContainerWidthInput";
 import HeatmapCheckbox from "../heatmap/HeatmapCheckbox";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
-import Select from "../ui/Select";
 import { useJobContext } from "../../context/JobContext";
 
 const VideoUploadDialog = ({
@@ -33,7 +25,6 @@ const VideoUploadDialog = ({
   fileInputRef,
   isLoading,
 }) => {
-  // Use context for state management
   const {
     setError,
     saveJobPreset: contextSaveJob,
@@ -60,38 +51,26 @@ const VideoUploadDialog = ({
     }
   };
 
-  const handleSave = () => {
-    // Validate inputs
-    if (!selectedFile) {
-      setValidationError("Please select a video file");
-      return;
-    }
-
-    if (frameInterval < 1) {
-      setValidationError("Frame interval must be at least 1");
-      return;
-    }
-
-    setValidationError(null);
+  const handleSave = async () => {
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      // Clear the file input
-      if (fileInputRef && fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-
-      // Save job data
-      if (onSave) {
-        onSave();
-      } else if (contextSaveJob) {
-        contextSaveJob();
-      }
-
-      // Close dialog and reset submission state
-      setIsSubmitting(false);
+    try {
+      // Always use server-side rendering
+      await onSave(
+        selectedFile,
+        selectedModel,
+        frameInterval,
+        containerWidth,
+        useHeatmap,
+        true // force server-side rendering
+      );
       onClose();
-    }, 500);
+    } catch (error) {
+      console.error("Error saving job:", error);
+      setError("Failed to create job. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -131,24 +110,15 @@ const VideoUploadDialog = ({
               onVideoUpload={handleVideoUpload}
               fileInputRef={fileInputRef}
             />
-            {fileSelected && (
-              <p className="text-xs text-green-600 mt-1">
-                ✓ Video file selected
-              </p>
-            )}
           </div>
 
-          {/* Model Selection as a compact dropdown */}
-          <div className="p-4 bg-purple-50 rounded-lg border border-purple-100">
-            <div className="flex items-center mb-2">
-              <Box className="h-4 w-4 text-purple-500 mr-2" />
-              <h3 className="text-md font-medium text-gray-700">Model</h3>
-            </div>
-            <Select
+          {/* Model Selection */}
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <ModelSelection
               value={selectedModel}
               onChange={onModelChange}
               options={[
-                { value: "yolov11n.pt", label: "YOLOv11n (Fastest)" },
+                { value: "yolov11n.pt", label: "YOLOv11n (Nano)" },
                 { value: "yolov11s.pt", label: "YOLOv11s (Small)" },
                 { value: "yolov11m.pt", label: "YOLOv11m (Medium)" },
                 { value: "yolov11l.pt", label: "YOLOv11l (Large)" },

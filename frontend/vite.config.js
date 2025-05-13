@@ -11,6 +11,14 @@ export default defineConfig({
         target: "http://localhost:5000",
         changeOrigin: true,
       },
+      "/process_video_server_side": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+      },
+      "/get_server_side_status": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+      },
       "/get_heatmap_video_info": {
         target: "http://localhost:5000",
         changeOrigin: true,
@@ -32,16 +40,20 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path,
         configure: (proxy, options) => {
-          proxy.on('error', (err, req, res) => {
-            console.log('proxy error', err);
+          proxy.on("error", (err, req, res) => {
+            console.log("proxy error", err);
           });
-          proxy.on('proxyReq', (proxyReq, req, res) => {
-            console.log('Sending Request to the Target:', req.method, req.url);
+          proxy.on("proxyReq", (proxyReq, req, res) => {
+            console.log("Sending Request to the Target:", req.method, req.url);
           });
-          proxy.on('proxyRes', (proxyRes, req, res) => {
-            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+          proxy.on("proxyRes", (proxyRes, req, res) => {
+            console.log(
+              "Received Response from the Target:",
+              proxyRes.statusCode,
+              req.url
+            );
           });
-        }
+        },
       },
     },
   },
