@@ -262,3 +262,53 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
                 logger.info(f"Successfully removed video file: {video_path}")
             except Exception as e:
                 logger.error(f"Error removing video file: {str(e)}")
+
+# Ensure server_side_process_video_task handles heatmap generation properly
+
+@celery_app.task(bind=True)
+def server_side_process_video_task(self, video_path, task_dir, model_name, frame_interval, use_heatmap=False):
+    """Process video with server-side rendering and return HLS stream URL"""
+    self.update_state(state='PROGRESS', meta={
+        'status': 'Starting server-side video processing'
+    })
+    
+    try:
+        # Import here to avoid circular imports
+        from .server_rendering import VideoRenderEngine
+        
+        # Create render engine
+        render_engine = VideoRenderEngine(model_name=model_name, confidence=0.25)
+        
+        # Set the task to allow progress updates
+        render_engine.set_task(self)
+        
+        # Process video and create HLS stream
+        result = render_engine.process_video(
+            video_path, 
+            task_dir,
+            frame_interval=frame_interval,
+            use_heatmap=use_heatmap
+        )
+        
+        if not result:
+            self.update_state(state='FAILURE', meta={
+                'status': 'Failed to process video'
+            })
+            return {'error': 'Failed to process video'}
+            
+        # Add task_id to result
+        result['task_id'] = self.request.id
+        result['use_heatmap'] = use_heatmap
+        
+        # Explicitly log the result structure for debugging
+        logger.info(f"Task completed with result keys: {result.keys()}")
+        
+        return result
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        self.update_state(state='FAILURE', meta={
+            'status': f'Error: {str(e)}',
+            'details': error_details
+        })
+        raise

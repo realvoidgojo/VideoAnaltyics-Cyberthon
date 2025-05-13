@@ -1,8 +1,41 @@
 from ultralytics import YOLO
 import torch
+import os
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(device)
+
+# Cache for models to avoid reloading them
+model_cache = {}
+
+def get_model(model_name="yolov11n.pt"):
+    """
+    Get or load a YOLO model by name.
+    
+    Args:
+        model_name: Name of the model file in the models directory
+        
+    Returns:
+        Loaded YOLO model
+    """
+    if model_name in model_cache:
+        return model_cache[model_name]
+        
+    # Add .pt extension if not present
+    if not model_name.endswith('.pt'):
+        model_name += '.pt'
+        
+    # Construct path to model
+    model_path = os.path.join("models", model_name)
+    
+    # Check if model exists
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file {model_path} not found. Please download it first.")
+        
+    # Load model
+    model = YOLO(model_path)
+    model_cache[model_name] = model
+    return model
 
 # Simple Unique ID generator (replace with more robust method if needed)
 class UniqueIDGenerator:
