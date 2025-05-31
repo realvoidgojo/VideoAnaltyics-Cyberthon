@@ -2,8 +2,6 @@ import React, { useState, useEffect } from "react";
 import { X, Upload, Sliders, Thermometer, AlertCircle } from "lucide-react";
 import VideoUpload from "./VideoUpload";
 import ModelSelection from "../inputs/ModelSelection";
-import FrameIntervalInput from "../inputs/FrameIntervalInput";
-import ContainerWidthInput from "../inputs/ContainerWidthInput";
 import HeatmapCheckbox from "../heatmap/HeatmapCheckbox";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
@@ -32,6 +30,22 @@ const VideoUploadDialog = ({
     setSelectedModel: contextSetModel,
   } = useJobContext();
 
+  // *** FIX: Use local state for form values to avoid closing dialog on change ***
+  const [localFrameInterval, setLocalFrameInterval] = useState(frameInterval);
+  const [localContainerWidth, setLocalContainerWidth] =
+    useState(containerWidth);
+  const [localUseHeatmap, setLocalUseHeatmap] = useState(useHeatmap);
+  const [localSelectedModel, setLocalSelectedModel] = useState(selectedModel);
+
+  // Sync local state with props if they change externally
+  useEffect(() => {
+    setLocalFrameInterval(frameInterval);
+    setLocalContainerWidth(containerWidth);
+    setLocalUseHeatmap(useHeatmap);
+    setLocalSelectedModel(selectedModel);
+  }, [frameInterval, containerWidth, useHeatmap, selectedModel]);
+
+  // *** END FIX ***
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fileSelected, setFileSelected] = useState(false);
   const [validationError, setValidationError] = useState(null);
@@ -81,14 +95,14 @@ const VideoUploadDialog = ({
     }
   };
 
-  // Enhanced save method with better error handling
+  // Enhanced save method with better model state handling
   const handleSave = async () => {
     if (!selectedFile) {
       setValidationError("Please select a video file");
       return;
     }
 
-    if (frameInterval < 1 || frameInterval > 30) {
+    if (localFrameInterval < 1 || localFrameInterval > 30) {
       setValidationError("Frame interval must be between 1 and 30");
       return;
     }
@@ -97,13 +111,29 @@ const VideoUploadDialog = ({
     setValidationError(null);
 
     try {
+      // Update global state before submitting
+      setFrameInterval(localFrameInterval);
+      setContainerWidth(localContainerWidth);
+      setUseHeatmap(localUseHeatmap);
+
+      // Handle model change specifically to ensure it's properly updated
+      if (localSelectedModel !== selectedModel) {
+        if (onModelChange) {
+          // Use the expected format for the event handler
+          onModelChange({ target: { value: localSelectedModel } });
+        } else if (contextSetModel) {
+          // Use context setter if available as fallback
+          contextSetModel(localSelectedModel);
+        }
+      }
+
       // Always use server-side rendering
       await onSave(
         selectedFile,
-        selectedModel,
-        frameInterval,
-        containerWidth,
-        useHeatmap,
+        localSelectedModel, // Use local state for submission
+        localFrameInterval,
+        localContainerWidth,
+        localUseHeatmap,
         true // force server-side rendering
       );
       onClose();
@@ -122,6 +152,14 @@ const VideoUploadDialog = ({
       }
       setIsSubmitting(false);
     }
+  };
+
+  // Handle local model change with proper event normalization
+  const handleLocalModelChange = (e) => {
+    // Handle both direct value changes and event objects
+    const newModelValue = e.target ? e.target.value : e;
+    console.log("Model changed to:", newModelValue);
+    setLocalSelectedModel(newModelValue);
   };
 
   return (
@@ -165,17 +203,50 @@ const VideoUploadDialog = ({
 
           {/* Model Selection */}
           <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center mb-2">
+              <svg
+                className="h-4 w-4 text-blue-500 mr-2"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+                <polyline points="7.5 19.79 7.5 14.6 3 12"></polyline>
+                <polyline points="21 12 16.5 14.6 16.5 19.79"></polyline>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+              </svg>
+              <h3 className="text-md font-medium text-gray-700">
+                Model Selection
+              </h3>
+            </div>
             <ModelSelection
-              value={selectedModel}
-              onChange={onModelChange}
+              value={localSelectedModel}
+              onChange={handleLocalModelChange}
               options={[
-                { value: "yolov11n.pt", label: "YOLOv11n (Nano)" },
-                { value: "yolov11s.pt", label: "YOLOv11s (Small)" },
-                { value: "yolov11m.pt", label: "YOLOv11m (Medium)" },
-                { value: "yolov11l.pt", label: "YOLOv11l (Large)" },
-                { value: "yolov11x.pt", label: "YOLOv11x (Extra Large)" },
+                {
+                  value: "yolov11n.pt",
+                  label: "YOLOv11n (Nano) - Fastest, Lower Accuracy",
+                },
+                {
+                  value: "yolov11s.pt",
+                  label: "YOLOv11s (Small) - Fast, Good Accuracy",
+                },
+                { value: "yolov11m.pt", label: "YOLOv11m (Medium) - Balanced" },
+                {
+                  value: "yolov11l.pt",
+                  label: "YOLOv11l (Large) - High Accuracy",
+                },
+                {
+                  value: "yolov11x.pt",
+                  label: "YOLOv11x (Extra Large) - Best Accuracy",
+                },
               ]}
-              helperText="Select model size"
             />
           </div>
 
@@ -187,26 +258,31 @@ const VideoUploadDialog = ({
             </div>
 
             <div className="grid grid-cols-2 gap-3">
+              {/* *** FIX: Use local state handlers *** */}
               <Input
                 label="Frame Interval"
                 type="number"
-                value={frameInterval}
-                onChange={(e) => setFrameInterval(parseInt(e.target.value, 10))}
+                value={localFrameInterval}
+                onChange={(e) =>
+                  setLocalFrameInterval(parseInt(e.target.value, 10) || 1)
+                }
                 min="1"
+                max="30"
                 helperText="Every nth frame"
               />
 
               <Input
                 label="Width"
                 type="number"
-                value={containerWidth}
+                value={localContainerWidth}
                 onChange={(e) =>
-                  setContainerWidth(parseInt(e.target.value, 10))
+                  setLocalContainerWidth(parseInt(e.target.value, 10) || 100)
                 }
                 min="100"
                 max="1920"
                 helperText="Display width"
               />
+              {/* *** END FIX *** */}
             </div>
           </div>
 
@@ -218,10 +294,12 @@ const VideoUploadDialog = ({
                 Heatmap Analysis
               </h3>
             </div>
+            {/* *** FIX: Use local state for heatmap *** */}
             <HeatmapCheckbox
-              useHeatmap={useHeatmap}
-              setUseHeatmap={setUseHeatmap}
+              useHeatmap={localUseHeatmap}
+              setUseHeatmap={setLocalUseHeatmap}
             />
+            {/* *** END FIX *** */}
           </div>
         </div>
 
