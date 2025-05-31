@@ -2,6 +2,9 @@
 venv/
 .env
 
+# hls
+hls_stream/
+
 # Python-related
 __pycache__/
 *.pyc

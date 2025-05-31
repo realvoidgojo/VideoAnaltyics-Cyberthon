@@ -41,18 +41,60 @@ const VideoUploadDialog = ({
     setFileSelected(!!selectedFile);
   }, [selectedFile]);
 
+  // Validate file size before upload
+  const validateFile = (file) => {
+    // Check file size (limit to 500MB)
+    const maxSize = 500 * 1024 * 1024; // 500MB in bytes
+    if (file.size > maxSize) {
+      setValidationError(`File too large. Maximum size is 500MB.`);
+      return false;
+    }
+
+    // Check file type
+    if (!file.type.startsWith("video/")) {
+      setValidationError("Please select a valid video file.");
+      return false;
+    }
+
+    return true;
+  };
+
+  // Enhance handleVideoUpload method
   const handleVideoUpload = (e) => {
-    setFileSelected(e.target.files && e.target.files.length > 0);
-    setValidationError(null);
-    if (onVideoUpload) {
-      onVideoUpload(e);
-    } else if (contextHandleUpload) {
-      contextHandleUpload(e);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (validateFile(file)) {
+        setFileSelected(true);
+        setValidationError(null);
+
+        if (onVideoUpload) {
+          onVideoUpload(e);
+        } else if (contextHandleUpload) {
+          contextHandleUpload(e);
+        }
+      } else {
+        // Clear the file input if validation fails
+        e.target.value = null;
+        setFileSelected(false);
+      }
     }
   };
 
+  // Enhanced save method with better error handling
   const handleSave = async () => {
+    if (!selectedFile) {
+      setValidationError("Please select a video file");
+      return;
+    }
+
+    if (frameInterval < 1 || frameInterval > 30) {
+      setValidationError("Frame interval must be between 1 and 30");
+      return;
+    }
+
     setIsSubmitting(true);
+    setValidationError(null);
 
     try {
       // Always use server-side rendering
@@ -67,8 +109,17 @@ const VideoUploadDialog = ({
       onClose();
     } catch (error) {
       console.error("Error saving job:", error);
-      setError("Failed to create job. Please try again.");
-    } finally {
+
+      // More specific error messages
+      if (error.response?.status === 413) {
+        setValidationError(
+          "File size too large. Please select a smaller video."
+        );
+      } else if (error.response?.data?.error) {
+        setValidationError(error.response.data.error);
+      } else {
+        setValidationError("Failed to create job. Please try again.");
+      }
       setIsSubmitting(false);
     }
   };

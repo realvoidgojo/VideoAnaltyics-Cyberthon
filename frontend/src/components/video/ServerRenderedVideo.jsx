@@ -28,43 +28,102 @@ const ServerRenderedVideo = ({ taskID, visible }) => {
       try {
         setIsLoading(true);
         setVideoError(false);
+        setErrorDetails("");
 
-        // Get server-side status to check if video is available
-        const statusResponse = await axios.get(
-          `/get_server_side_status/${taskID}`
-        );
+        // Add a status check with retry logic
+        let retryCount = 0;
+        const maxRetries = 3;
+        let success = false;
 
-        if (
-          statusResponse.data.state === "SUCCESS" &&
-          statusResponse.data.status
-        ) {
-          const result = statusResponse.data.status;
+        while (!success && retryCount < maxRetries) {
+          try {
+            // Get server-side status first
+            const statusResponse = await axios.get(
+              `/get_server_side_status/${taskID}`
+            );
 
-          // Check for HLS URL
-          if (result.hls_url) {
-            setVideoInfo({
-              hls_url: result.hls_url,
-              master_url: result.master_url,
-              width: result.width,
-              height: result.height,
-              stream_url: `/stream_processed_video/${taskID}`,
-            });
-            setStreamType("hls");
-          } else {
-            // Fallback to other stream info
-            const response = await axios.get(`/get_video_info/${taskID}`);
-            setVideoInfo(response.data);
-            setStreamType(response.data.hls_url ? "hls" : "direct");
+            if (
+              statusResponse.data.state === "SUCCESS" &&
+              statusResponse.data.status
+            ) {
+              const result = statusResponse.data.status;
+
+              // Check if we have HLS URL
+              if (result.hls_url) {
+                setVideoInfo({
+                  hls_url: result.hls_url,
+                  master_url: result.master_url || result.hls_url,
+                  width: result.width,
+                  height: result.height,
+                  stream_url: `/stream_processed_video/${taskID}`,
+                });
+                setStreamType("hls");
+                success = true;
+              }
+              // Try alternate URLs if available
+              else if (result.master_url) {
+                setVideoInfo({
+                  hls_url: result.master_url,
+                  stream_url: `/stream_processed_video/${taskID}`,
+                  width: result.width,
+                  height: result.height,
+                });
+                setStreamType("hls");
+                success = true;
+              } else {
+                // Fall back to direct stream
+                setVideoInfo({
+                  stream_url: `/stream_processed_video/${taskID}`,
+                  mime_type: "video/mp4",
+                });
+                setStreamType("direct");
+                success = true;
+              }
+            } else if (statusResponse.data.state === "PROGRESS") {
+              // Update UI to show that video is still being processed
+              setErrorDetails(
+                "Video processing is still in progress. Please wait."
+              );
+              // Don't set success=true here so we'll retry
+            } else if (
+              statusResponse.data.state === "FAILURE" ||
+              statusResponse.data.state === "REVOKED"
+            ) {
+              setVideoError(true);
+              setErrorDetails(
+                `Video processing failed: ${
+                  statusResponse.data.status || "Unknown error"
+                }`
+              );
+              break; // Don't retry on failures
+            } else {
+              // Try fallback endpoint
+              const response = await axios.get(`/get_video_info/${taskID}`);
+              if (response.data) {
+                setVideoInfo(response.data);
+                setStreamType(response.data.hls_url ? "hls" : "direct");
+                success = true;
+              }
+            }
+          } catch (err) {
+            console.error(`Attempt ${retryCount + 1} failed:`, err);
+            retryCount++;
+
+            // Wait longer between retries
+            if (retryCount < maxRetries) {
+              await new Promise((resolve) =>
+                setTimeout(resolve, 2000 * retryCount)
+              );
+            }
           }
-        } else if (statusResponse.data.state === "PROGRESS") {
+        }
+
+        // If we've exhausted retries without success
+        if (!success) {
+          setVideoError(true);
           setErrorDetails(
-            "Video processing is still in progress. Please wait."
+            "Unable to load video after multiple attempts. Please try again later."
           );
-        } else {
-          // Fallback to dedicated video info endpoint
-          const response = await axios.get(`/get_video_info/${taskID}`);
-          setVideoInfo(response.data);
-          setStreamType(response.data.hls_url ? "hls" : "direct");
         }
       } catch (error) {
         console.error("Error fetching video info:", error);

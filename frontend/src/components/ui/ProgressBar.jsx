@@ -15,16 +15,17 @@ const ProgressBar = ({
 
   // Determine if the task is completed
   const isCompleted =
-    safeProgress >= 100 || processingStage === "Processing complete";
+    safeProgress >= 100 ||
+    processingStage?.toLowerCase() === "processing complete";
 
   // Format stage label based on current processing stage
   const getStageLabel = () => {
     if (!processingStage) return "Processing...";
 
     if (useHeatmap) {
-      if (processingStage.includes("heatmap")) {
+      if (processingStage?.toLowerCase().includes("heatmap")) {
         return "Phase 1: Heatmap Analysis";
-      } else if (processingStage.includes("Processing frame")) {
+      } else if (processingStage?.toLowerCase().includes("processing frame")) {
         return "Phase 2: Object Detection";
       }
     }
@@ -36,26 +37,40 @@ const ProgressBar = ({
   const getCurrentPhase = () => {
     if (!useHeatmap) return null;
 
-    if (processingStage?.includes("heatmap")) return 1;
-    if (processingStage?.includes("Processing frame")) return 2;
+    if (processingStage?.toLowerCase().includes("heatmap")) return 1;
+    if (processingStage?.toLowerCase().includes("processing frame")) return 2;
 
     return null;
   };
 
   const currentPhase = getCurrentPhase();
 
+  // Format estimated time left
+  const formatTime = (seconds) => {
+    if (!seconds || seconds <= 0) return null;
+
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+
+    if (mins > 0) {
+      return `${mins}m ${secs}s remaining`;
+    }
+    return `${secs}s remaining`;
+  };
+
+  const timeLeftFormatted = formatTime(estimatedTimeLeft);
+
   return (
     <div className="mt-4">
       {/* Progress bar container */}
       <div className="w-full bg-gray-200 rounded-full h-5 overflow-hidden shadow-inner">
-        {/* Progress bar fill */}
+        {/* Progress bar fill with smoother animation */}
         <div
-          className={`h-full flex items-center justify-center transition-all duration-500 ${
+          className={`h-full flex items-center justify-center transition-all duration-700 ${
             isCompleted ? "bg-green-500" : "bg-blue-600"
           }`}
           style={{
             width: `${safeProgress}%`,
-            transition: "width 0.5s ease-in-out",
           }}
         >
           <span className="text-xs text-white font-medium shadow-sm">
@@ -98,7 +113,7 @@ const ProgressBar = ({
         </div>
       )}
 
-      {/* Information area */}
+      {/* Information area with improved time remaining display */}
       <div className="flex justify-between mt-2 text-sm text-gray-600">
         <div className="flex items-center">
           {isCompleted ? (
@@ -109,8 +124,8 @@ const ProgressBar = ({
           <span>{getStageLabel()}</span>
         </div>
 
-        {estimatedTimeLeft && !isCompleted && (
-          <div className="font-medium">{estimatedTimeLeft}</div>
+        {timeLeftFormatted && !isCompleted && (
+          <div className="font-medium text-blue-600">{timeLeftFormatted}</div>
         )}
       </div>
     </div>
