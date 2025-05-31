@@ -1,41 +1,72 @@
 from ultralytics import YOLO
 import torch
 import os
+import time
+import logging
+
+# Setup logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(device)
 
-# Cache for models to avoid reloading them
-model_cache = {}
+# Model cache to avoid reloading
+_model_cache = {}
 
-def get_model(model_name="yolov11n.pt"):
-    """
-    Get or load a YOLO model by name.
+def load_model(model_path):
+    """Load YOLO model with caching for better performance"""
+    if model_path in _model_cache:
+        # Check if the model was loaded recently (within last 30 minutes)
+        model_data = _model_cache[model_path]
+        if time.time() - model_data['timestamp'] < 1800:  # 30 minutes
+            logger.info(f"Using cached model for {model_path}")
+            return model_data['model']
     
-    Args:
-        model_name: Name of the model file in the models directory
+    logger.info(f"Loading model from {model_path}")
+    try:
+        # Load the model
+        from ultralytics import YOLO
+        model = YOLO(model_path)
         
-    Returns:
-        Loaded YOLO model
-    """
-    if model_name in model_cache:
-        return model_cache[model_name]
+        # Cache the model with timestamp
+        _model_cache[model_path] = {
+            'model': model,
+            'timestamp': time.time()
+        }
         
-    # Add .pt extension if not present
-    if not model_name.endswith('.pt'):
-        model_name += '.pt'
+        return model
+    except Exception as e:
+        logger.error(f"Error loading model {model_path}: {e}", exc_info=True)
+        raise
+
+# Add the missing get_model function
+def get_model(model_name):
+    """Get a YOLO model by name - wrapper for load_model"""
+    # Validate model name
+    if not model_name:
+        model_name = "yolov11n.pt"  # Default model
+        logger.warning(f"No model specified, using default: {model_name}")
+
+    # Check if model path is absolute or relative
+    if os.path.isabs(model_name):
+        model_path = model_name
+    else:
+        # If path doesn't have .pt extension, add it
+        if not model_name.endswith('.pt'):
+            model_name = f"{model_name}.pt"
+            
+        # Check models directory
+        model_path = os.path.join("models", model_name)
         
-    # Construct path to model
-    model_path = os.path.join("models", model_name)
-    
-    # Check if model exists
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model file {model_path} not found. Please download it first.")
-        
-    # Load model
-    model = YOLO(model_path)
-    model_cache[model_name] = model
-    return model
+        # Verify model exists
+        if not os.path.exists(model_path):
+            error_msg = f"Model '{model_name}' not found in models directory. Available models: {os.listdir('models')}"
+            logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
+
+    logger.info(f"Loading model: {model_path}")
+    return load_model(model_path)
 
 # Simple Unique ID generator (replace with more robust method if needed)
 class UniqueIDGenerator:

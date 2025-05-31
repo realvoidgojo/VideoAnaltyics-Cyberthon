@@ -8,6 +8,9 @@ import numpy as np
 import base64
 from progress.bar import Bar
 import tempfile
+import atexit
+import functools
+import shutil
 
 # Configure logging within this module
 logger = logging.getLogger(__name__)
@@ -17,6 +20,39 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
+
+# Track temporary files for cleanup
+_temp_files = set()
+_temp_dirs = set()
+
+def register_temp_file(path):
+    """Register a temporary file for cleanup at exit"""
+    _temp_files.add(path)
+    return path
+    
+def register_temp_dir(path):
+    """Register a temporary directory for cleanup at exit"""
+    _temp_dirs.add(path)
+    return path
+    
+def cleanup_temp_files():
+    """Clean up registered temporary files and directories"""
+    for path in _temp_files:
+        try:
+            if os.path.exists(path):
+                os.unlink(path)
+        except Exception as e:
+            logger.warning(f"Failed to clean up temp file {path}: {e}")
+    
+    for path in _temp_dirs:
+        try:
+            if os.path.exists(path):
+                shutil.rmtree(path)
+        except Exception as e:
+            logger.warning(f"Failed to clean up temp dir {path}: {e}")
+            
+# Register the cleanup function to run at exit
+atexit.register(cleanup_temp_files)
 
 # We've moved this function to heatmap_analysis.py
 # This stub is kept to avoid breaking existing code
@@ -55,9 +91,19 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
                     return None
             except Exception as e:
                 logger.error(f"Error checking task state: {e}")
-
-        # Add progress tracking
-        self.update_state(state='STARTED', meta={'status': 'Extracting frames'})
+                
+        # Progress tracking helper function
+        def update_progress(message, percent, extra=None):
+            update_data = {
+                'status': message,
+                'percent': percent
+            }
+            if extra:
+                update_data.update(extra)
+            self.update_state(state='PROGRESS', meta=update_data)
+            
+        # Use the helper function for consistent progress updates
+        update_progress('Extracting frames', 5)
         
         # Generate heatmap frames if requested
         heatmap_frames = []
@@ -263,52 +309,146 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
             except Exception as e:
                 logger.error(f"Error removing video file: {str(e)}")
 
+def validate_model(model_name):
+    """Validate that the selected model exists"""
+    if not model_name:
+        return os.path.join("models", "yolov11n.pt")
+        
+    # If path doesn't have .pt extension, add it
+    if not model_name.endswith('.pt'):
+        model_name = f"{model_name}.pt"
+        
+    model_path = os.path.join("models", model_name)
+    if not os.path.exists(model_path):
+        available_models = os.listdir("models")
+        models_str = ", ".join([m for m in available_models if m.endswith('.pt')])
+        raise ValueError(f"Model '{model_name}' not found. Available models: {models_str}")
+    return model_path
+
 # Ensure server_side_process_video_task handles heatmap generation properly
 
 @celery_app.task(bind=True)
 def server_side_process_video_task(self, video_path, task_dir, model_name, frame_interval, use_heatmap=False):
     """Process video with server-side rendering and return HLS stream URL"""
+    # Register the video path for cleanup
+    register_temp_file(video_path)
+    
     self.update_state(state='PROGRESS', meta={
-        'status': 'Starting server-side video processing'
+        'status': 'Starting server-side video processing',
+        'percent': 5
     })
     
     try:
-        # Import here to avoid circular imports
-        from .server_rendering import VideoRenderEngine
+        # Validate model first
+        try:
+            model_path = validate_model(model_name)
+            logger.info(f"Validated model: {model_path}")
+        except ValueError as e:
+            logger.error(f"Model validation error: {str(e)}")
+            self.update_state(state='FAILURE', meta={
+                'status': str(e),
+                'error': str(e)
+            })
+            return {
+                'error': str(e),
+                'exc_type': 'ValueError',
+                'exc_message': str(e),
+                'exc_module': 'builtins'
+            }
+            
+        # Create render engine with proper exception handling
+        try:
+            from .server_rendering import VideoRenderEngine
+            render_engine = VideoRenderEngine(model_name=model_name, confidence=0.25)
+            render_engine.set_task(self)
+        except Exception as e:
+            logger.error(f"Error creating render engine: {str(e)}", exc_info=True)
+            self.update_state(state='FAILURE', meta={
+                'status': f'Failed to initialize rendering engine: {str(e)}',
+                'error': str(e)
+            })
+            return {
+                'error': str(e),
+                'exc_type': type(e).__name__,
+                'exc_message': str(e),
+                'exc_module': type(e).__module__
+            }
         
-        # Create render engine
-        render_engine = VideoRenderEngine(model_name=model_name, confidence=0.25)
-        
-        # Set the task to allow progress updates
-        render_engine.set_task(self)
+        self.update_state(state='PROGRESS', meta={
+            'status': 'Processing video with server-side renderer',
+            'percent': 10
+        })
         
         # Process video and create HLS stream
-        result = render_engine.process_video(
-            video_path, 
-            task_dir,
-            frame_interval=frame_interval,
-            use_heatmap=use_heatmap
-        )
-        
-        if not result:
-            self.update_state(state='FAILURE', meta={
-                'status': 'Failed to process video'
-            })
-            return {'error': 'Failed to process video'}
+        try:
+            # Ensure proper boolean conversion for use_heatmap
+            use_heatmap_bool = use_heatmap
+            if isinstance(use_heatmap, str):
+                use_heatmap_bool = use_heatmap.lower() == 'true'
+                
+            # Convert frame_interval to int if it's a string
+            if isinstance(frame_interval, str):
+                try:
+                    frame_interval = int(frame_interval)
+                except ValueError:
+                    frame_interval = 5  # Default if conversion fails
+                    
+            logger.info(f"Processing video with frame_interval={frame_interval}, use_heatmap={use_heatmap_bool}")
             
-        # Add task_id to result
-        result['task_id'] = self.request.id
-        result['use_heatmap'] = use_heatmap
-        
-        # Explicitly log the result structure for debugging
-        logger.info(f"Task completed with result keys: {result.keys()}")
-        
-        return result
+            result = render_engine.process_video(
+                video_path, 
+                task_dir,
+                frame_interval=frame_interval,
+                use_heatmap=use_heatmap_bool
+            )
+            
+            if not result:
+                self.update_state(state='FAILURE', meta={
+                    'status': 'Failed to process video',
+                    'error': 'Process returned no result'
+                })
+                return {
+                    'error': 'Failed to process video',
+                    'exc_type': 'RuntimeError',
+                    'exc_message': 'Video processing returned no result',
+                    'exc_module': 'builtins'
+                }
+                
+            # Add task_id to result
+            result['task_id'] = self.request.id
+            result['use_heatmap'] = use_heatmap_bool
+            
+            # Explicitly log the result structure for debugging
+            logger.info(f"Task completed with result keys: {result.keys()}")
+            
+            return result
+        except Exception as e:
+            logger.error(f"Error processing video: {str(e)}", exc_info=True)
+            error_details = traceback.format_exc()
+            self.update_state(state='FAILURE', meta={
+                'status': f'Error: {str(e)}',
+                'details': error_details,
+                'error': str(e)
+            })
+            return {
+                'error': str(e),
+                'exc_type': type(e).__name__,
+                'exc_message': str(e),
+                'exc_module': type(e).__module__,
+                'details': error_details
+            }
     except Exception as e:
-        import traceback
+        logger.error(f"Unhandled exception in server_side_process_video_task: {str(e)}", exc_info=True)
         error_details = traceback.format_exc()
         self.update_state(state='FAILURE', meta={
             'status': f'Error: {str(e)}',
-            'details': error_details
+            'details': error_details,
+            'error': str(e)
         })
-        raise
+        return {
+            'error': str(e),
+            'exc_type': type(e).__name__,
+            'exc_message': str(e),
+            'exc_module': type(e).__module__,
+            'details': error_details
+        }

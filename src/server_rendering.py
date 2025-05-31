@@ -16,10 +16,20 @@ class VideoRenderEngine:
     def __init__(self, model_name="yolov11s.pt", confidence=0.25):
         self.model_name = model_name
         self.confidence = confidence
-        # Import here to avoid circular imports
-        from src.object_detection import get_model
-        self.model = get_model(model_name)
         self.celery_task = None
+        
+        try:
+            # Import here to avoid circular imports
+            from src.object_detection import get_model
+            self.model = get_model(model_name)
+            logger.info(f"Successfully initialized model: {model_name}")
+        except (ImportError, FileNotFoundError) as e:
+            logger.error(f"Failed to initialize model: {e}")
+            # Create a more informative error
+            if isinstance(e, ImportError):
+                raise ImportError(f"Could not import required module: {str(e)}")
+            else:
+                raise ValueError(f"Model initialization failed: {str(e)}")
     
     def set_task(self, task):
         """Set the Celery task for progress updates"""
@@ -27,6 +37,26 @@ class VideoRenderEngine:
     
     def process_video(self, video_path, output_dir, frame_interval=5, use_heatmap=False):
         """Process video and generate HLS stream with detections rendered"""
+        
+        # Ensure frame_interval is an integer
+        try:
+            frame_interval = int(frame_interval)
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid frame interval '{frame_interval}', using default of 5")
+            frame_interval = 5
+            
+        # Constrain within reasonable bounds
+        frame_interval = max(1, min(30, frame_interval))
+        
+        logger.info(f"Processing video with frame interval: {frame_interval}")
+        
+        # Convert use_heatmap to boolean if it's a string
+        if isinstance(use_heatmap, str):
+            use_heatmap = use_heatmap.lower() == 'true'
+        
+        # Add explicit logging of heatmap mode
+        logger.info(f"Processing video with heatmap mode: {use_heatmap}")
+        
         if not os.path.exists(output_dir):
             os.makedirs(output_dir, exist_ok=True)
         
@@ -272,7 +302,9 @@ class VideoRenderEngine:
             'processed_frames': processed_frames,
             'segment_count': segment_count,
             'object_frequency': object_frequency,  # Add this to the result
-            'unique_object_count': len(unique_objects)  # Add this to the result
+            'unique_object_count': len(unique_objects),  # Add this to the result
+            'use_heatmap': use_heatmap,  # Make sure this is a boolean
+            'rendered_video_path': temp_output_mp4  # Add this line to include the processed video path
         }
 
         # At the end, before returning result, add heatmap analysis data
