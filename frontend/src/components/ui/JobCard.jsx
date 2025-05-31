@@ -49,20 +49,31 @@ const JobCard = ({ job }) => {
     if (!job.serverTaskId) return;
 
     let intervalId;
-    const pollInterval = 2000;
+    const pollInterval = 2000; // Poll every 2 seconds
+    let consecutiveErrorCount = 0;
+    const maxErrorCount = 3;
 
     const pollTaskStatus = async () => {
       try {
         const response = await axios.get(`/task_status/${job.serverTaskId}`);
         const { state, status } = response.data;
 
+        // Reset error count on successful requests
+        consecutiveErrorCount = 0;
+
         // Update processing state based on task state
-        if (state === "SUCCESS" || state === "FAILURE" || state === "REVOKED") {
+        if (["SUCCESS", "FAILURE", "REVOKED"].includes(state)) {
           setIsProcessing(false);
+          // Clear interval when processing is complete
+          if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
         } else {
           setIsProcessing(true);
         }
 
+        // Update progress and status information
         if (status) {
           if (status.percent !== undefined) {
             const progressValue = parseFloat(status.percent);
@@ -76,17 +87,31 @@ const JobCard = ({ job }) => {
           }
         }
 
+        // Calculate estimated time remaining
         if (processingStartTime.current && status && status.percent > 0) {
           const elapsedMs = new Date() - processingStartTime.current;
           const totalEstimatedMs = (elapsedMs * 100) / status.percent;
           const remainingMs = totalEstimatedMs - elapsedMs;
 
           if (remainingMs > 0) {
-            setEstimatedTimeLeft(Math.round(remainingMs / 1000));
+            // Update time estimation but smooth the changes to avoid jumps
+            const seconds = Math.round(remainingMs / 1000);
+            setEstimatedTimeLeft((prevTime) => {
+              // Smooth the time estimate by averaging with previous value
+              return prevTime ? Math.round((prevTime + seconds) / 2) : seconds;
+            });
           }
         }
       } catch (error) {
         console.error("Error polling task status:", error);
+        consecutiveErrorCount++;
+
+        // If we've had multiple consecutive errors, stop polling
+        if (consecutiveErrorCount >= maxErrorCount && intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+          setProcessingStage("Connection lost to server");
+        }
       }
     };
 
@@ -94,6 +119,7 @@ const JobCard = ({ job }) => {
     pollTaskStatus();
     intervalId = setInterval(pollTaskStatus, pollInterval);
 
+    // Clean up interval on unmount
     return () => {
       if (intervalId) {
         clearInterval(intervalId);
