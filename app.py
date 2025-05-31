@@ -69,27 +69,49 @@ def reset_processing():
         return jsonify({'error': 'No task ID provided'}), 400
     
     try:
-        task = process_video_task.AsyncResult(task_id)
-        # Revoke the task and mark it as cancelled
-        task.revoke(terminate=False)
+        # Try both task types
+        from src.video_processing_tasks import server_side_process_video_task, process_video_task
         
-        # Store the REVOKED state with proper exception information
-        task.backend.store_result(
-            task_id,
-            {
-                'exc_type': 'TaskCancellation',
-                'exc_message': 'Task cancelled by user',
-                'exc_module': 'celery.exceptions'
-            },
-            'REVOKED'
-        )
+        cancelled = False
         
-        return jsonify({
-            'message': f'Task {task_id} has been marked for cancellation',
-            'state': 'REVOKED'
-        })
+        for task_func in [server_side_process_video_task, process_video_task]:
+            try:
+                task = task_func.AsyncResult(task_id)
+                # Only try to revoke if the task exists and is active
+                if task and task.state in ['PENDING', 'STARTED', 'PROGRESS']:
+                    # Revoke and terminate the task
+                    task.revoke(terminate=True)
+                    
+                    # Store the REVOKED state with proper exception information
+                    task.backend.store_result(
+                        task_id,
+                        {
+                            'status': 'Task cancelled by user',
+                            'exc_type': 'TaskCancellation',
+                            'exc_message': 'Task cancelled by user',
+                            'exc_module': 'celery.exceptions'
+                        },
+                        'REVOKED'
+                    )
+                    
+                    cancelled = True
+                    break
+            except Exception as inner_e:
+                app.logger.warning(f"Error trying to cancel task type {task_func.__name__}: {str(inner_e)}")
+        
+        if cancelled:
+            return jsonify({
+                'message': f'Task {task_id} has been cancelled',
+                'state': 'REVOKED'
+            })
+        else:
+            return jsonify({
+                'message': f'Task {task_id} was not found or is already complete',
+                'state': 'NOT_CANCELLED'
+            })
+            
     except Exception as e:
-        app.logger.error(f"Error cancelling task: {str(e)}")
+        app.logger.error(f"Error cancelling task: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 # End point to pause the video
@@ -480,45 +502,89 @@ def process_video():
         app.logger.error(f"Error processing video: {str(e)}", exc_info=True)
         return jsonify({'error': f'Error processing video: {str(e)}'}), 500
 
+def error_response(message, status_code=500, details=None):
+    """Standardized error response format"""
+    response = {
+        'error': message,
+        'status': 'error'
+    }
+    if details:
+        response['details'] = details
+    
+    app.logger.error(f"Error {status_code}: {message}")
+    return jsonify(response), status_code
+
 @app.route('/process_video_server_side', methods=['POST'])
 def process_video_server_side():
     """Process video with server-side rendering and return HLS stream URL"""
-    if 'video' not in request.files:
-        return jsonify({'error': 'No video file uploaded'}), 400
-    
-    video_file = request.files['video']
-    if video_file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
-    
-    # Get parameters
-    model_name = request.form.get('model', 'yolov11s.pt')
-    frame_interval = int(request.form.get('interval', 5))
-    use_heatmap = request.form.get('use_heatmap', 'false').lower() == 'true'
-    
-    # Generate unique ID for this processing task
-    task_id = str(uuid4())
-    
-    # Create task directory
-    task_dir = os.path.join('hls_stream', task_id)
-    os.makedirs(task_dir, exist_ok=True)
-    
-    # Save uploaded video
-    video_path = os.path.join(task_dir, 'input.mp4')
-    video_file.save(video_path)
-    
-    app.logger.info(f"Starting server-side processing task for video {video_path}")
-    
-    # Start the task
-    task = server_side_process_video_task.apply_async(
-        args=[video_path, task_dir, model_name, frame_interval, use_heatmap]
-    )
-    
-    # Return task ID and stream URL
-    return jsonify({
-        'task_id': task.id,
-        'stream_url': f'/hls_stream/{task_id}/stream.m3u8',
-        'status': 'processing'
-    }), 202
+    try:
+        app.logger.info("Received server-side video processing request")
+        
+        if 'video' not in request.files:
+            return error_response("No video file provided", 400)
+            
+        video_file = request.files['video']
+        if video_file.filename == '':
+            return error_response("No selected video file", 400)
+            
+        # Get other form parameters with better validation
+        model_name = request.form.get('model', 'yolov11s.pt')
+        
+        # Check if model exists
+        try:
+            from src.video_processing_tasks import validate_model
+            model_path = validate_model(model_name)
+        except ValueError as e:
+            return error_response(str(e), 400)
+        
+        # Validate frame interval
+        try:
+            frame_interval = int(request.form.get('interval', '5'))
+            if frame_interval < 1:
+                frame_interval = 1
+            elif frame_interval > 30:
+                frame_interval = 30
+        except ValueError:
+            frame_interval = 5
+            
+        # Parse use_heatmap parameter
+        use_heatmap = request.form.get('use_heatmap', 'false').lower() == 'true'
+        
+        app.logger.info(f"Server-side processing with model: {model_name}, interval: {frame_interval}, use_heatmap: {use_heatmap}")
+        
+        # Create a unique task directory for this request
+        task_id = str(uuid4())
+        task_dir = os.path.join(HLS_FOLDER, task_id)
+        os.makedirs(task_dir, exist_ok=True)
+        
+        # Save the uploaded file to a temporary location
+        temp_dir = tempfile.gettempdir()
+        video_path = os.path.join(temp_dir, f"{task_id}_{video_file.filename}")
+        video_file.save(video_path)
+        
+        app.logger.info(f"Saved video to temporary path: {video_path}")
+        app.logger.info(f"Created task directory: {task_dir}")
+        
+        # Start the Celery task
+        task = server_side_process_video_task.delay(
+            video_path,
+            task_dir,
+            model_name,
+            frame_interval,
+            use_heatmap
+        )
+        
+        app.logger.info(f"Started server-side processing task with ID: {task.id}")
+        
+        # Return the task ID to the client
+        return jsonify({
+            'task_id': task.id,
+            'message': 'Video processing started'
+        }), 202
+        
+    except Exception as e:
+        app.logger.error(f"Error in process_video_server_side: {str(e)}", exc_info=True)
+        return error_response(str(e))
 
 @app.route('/get_server_side_status/<task_id>', methods=['GET'])
 def get_server_side_status(task_id):
@@ -557,29 +623,54 @@ def get_server_side_status(task_id):
 
 @app.route('/get_detection_statistics/<task_id>', methods=['GET'])
 def get_detection_statistics(task_id):
-    """Get object detection statistics for a task"""
+    """Get object detection statistics for a task with enhanced data"""
     try:
-        task = server_side_process_video_task.AsyncResult(task_id)
-        
-        if task.state != 'SUCCESS':
-            return jsonify({'error': 'Task is not yet complete'}), 404
+        if not task_id:
+            return error_response("No task ID provided", 400)
             
-        result = task.info
-        if not result or not isinstance(result, dict):
-            return jsonify({'error': 'Invalid task result'}), 500
-            
-        # Extract statistics
-        stats = {
-            'object_frequency': result.get('object_frequency', {}),
-            'unique_object_count': result.get('unique_object_count', 0),
-            'total_frames': result.get('total_frames', 0),
-            'processed_frames': result.get('processed_frames', 0)
-        }
+        from src.video_processing_tasks import server_side_process_video_task, process_video_task
         
-        return jsonify(stats)
+        # Try both task types
+        for task_func in [server_side_process_video_task, process_video_task]:
+            task = task_func.AsyncResult(task_id)
+            
+            if task.state == 'SUCCESS' and task.info:
+                result = task.info
+                
+                if not isinstance(result, dict):
+                    continue
+                
+                # Extract object frequency data
+                object_frequency = result.get('object_frequency', {})
+                
+                if not object_frequency:
+                    app.logger.warning(f"No object frequency data found for task {task_id}")
+                    continue
+                    
+                # Calculate total objects
+                total_objects = sum(object_frequency.values())
+                
+                # Calculate percentages and create enhanced data
+                enhanced_data = {
+                    'object_frequency': object_frequency,
+                    'total_objects': total_objects,
+                    'class_distribution': {
+                        class_name: {
+                            'count': count,
+                            'percentage': round((count / total_objects) * 100, 2) if total_objects > 0 else 0
+                        }
+                        for class_name, count in object_frequency.items()
+                    },
+                    'most_frequent': max(object_frequency.items(), key=lambda x: x[1])[0] if object_frequency else None
+                }
+                
+                return jsonify(enhanced_data)
+                
+        # If we get here, no successful task was found
+        return error_response("No detection statistics available for this task", 404)
+        
     except Exception as e:
-        app.logger.error(f"Error getting detection statistics: {str(e)}", exc_info=True)
-        return jsonify({'error': f'Error getting statistics: {str(e)}'}), 500
+        return error_response(str(e))
 
 @app.route('/get_heatmap_analysis/<task_id>', methods=['GET'])
 def get_heatmap_analysis(task_id):
@@ -628,6 +719,159 @@ def get_heatmap_analysis(task_id):
     except Exception as e:
         app.logger.error(f"Error getting heatmap analysis: {str(e)}", exc_info=True)
         return jsonify({'error': f'Error getting heatmap analysis: {str(e)}'}), 500
+
+@app.route('/get_video_info/<task_id>', methods=['GET'])
+def get_video_info(task_id):
+    """Get video info for a task"""
+    try:
+        if not task_id:
+            return error_response("No task ID provided", 400)
+            
+        # Try both task types to find the right one
+        from src.video_processing_tasks import server_side_process_video_task, process_video_task
+        
+        # First check the server-side rendering task
+        task = server_side_process_video_task.AsyncResult(task_id)
+        
+        # If not found or not complete, try the regular processing task
+        if task.state != 'SUCCESS' or not task.info:
+            task = process_video_task.AsyncResult(task_id)
+            
+        if task.state == 'SUCCESS' and task.info:
+            result = task.info
+            
+            # Validate result structure
+            if not isinstance(result, dict):
+                app.logger.warning(f"Unexpected task result format: {type(result)}")
+                return error_response("Invalid task result format", 500)
+                
+            # Construct response
+            response = {
+                'stream_url': result.get('stream_url', f'/stream_processed_video/{task_id}'),
+                'mime_type': 'video/mp4',
+                'width': result.get('width', 640),
+                'height': result.get('height', 480)
+            }
+            
+            # Add HLS URL if available
+            if 'hls_url' in result:
+                response['hls_url'] = result['hls_url']
+                
+            return jsonify(response)
+        elif task.state == 'FAILURE' or task.state == 'REVOKED':
+            error_msg = str(task.info) if task.info else "Task failed or was cancelled"
+            return error_response(error_msg, 400)
+        else:
+            return error_response(f"Task is still in progress: {task.state}", 400)
+            
+    except Exception as e:
+        return error_response(str(e))
+
+@app.route('/download_processed_video/<task_id>', methods=['GET'])
+def download_processed_video(task_id):
+    """Returns the processed detection video for a completed task."""
+    try:
+        app.logger.info(f"Attempting to download processed video for task {task_id}")
+        
+        # Try both task types since we have both client-side and server-side processing
+        for task_func in [server_side_process_video_task, process_video_task]:
+            task = task_func.AsyncResult(task_id)
+            
+            if task.state in ['SUCCESS', 'PROGRESS'] and task.info:
+                result = task.info
+                
+                # Check for rendered_video_path first (added in our fix)
+                if isinstance(result, dict) and 'rendered_video_path' in result:
+                    video_path = result['rendered_video_path']
+                    
+                    if os.path.exists(video_path):
+                        # Get the correct mimetype based on file extension
+                        mimetype = 'video/mp4'
+                        extension = '.mp4'
+                        if video_path.endswith('.avi'):
+                            mimetype = 'video/x-msvideo'
+                            extension = '.avi'
+                        
+                        app.logger.info(f"Serving directly rendered video for download: {video_path}")
+                        return send_file(
+                            video_path,
+                            mimetype=mimetype,
+                            as_attachment=True,
+                            download_name=f"detection_{task_id}{extension}"
+                        )
+                
+                # If no rendered_video_path, check for temp_processed video in the HLS directory
+                if isinstance(result, dict) and ('hls_url' in result or 'master_url' in result):
+                    task_dir = os.path.join(HLS_FOLDER, task_id)
+                    
+                    # Check standard processed video locations
+                    for filename in ["temp_processed.mp4", "processed_video.mp4", "output.mp4"]:
+                        processed_video_path = os.path.join(task_dir, filename)
+                        if os.path.exists(processed_video_path):
+                            app.logger.info(f"Found processed video at {processed_video_path}")
+                            return send_file(
+                                processed_video_path,
+                                mimetype='video/mp4',
+                                as_attachment=True,
+                                download_name=f"detection_{task_id}.mp4"
+                            )
+                    
+                    # If no direct file found, try to create from HLS segments
+                    # ... existing HLS segment code ...
+                    
+        # Fallback: If we still don't have a video, try to generate one from existing HLS segments
+        task_dir = os.path.join(HLS_FOLDER, task_id)
+        if os.path.exists(task_dir):
+            segments = sorted([f for f in os.listdir(task_dir) if f.endswith('.ts')])
+            
+            if segments:
+                # Create output path for the processed video
+                processed_video_path = os.path.join(task_dir, "processed_video.mp4")
+                
+                # Create a file listing all segments for ffmpeg
+                segments_list_path = os.path.join(task_dir, "segments.txt")
+                with open(segments_list_path, 'w') as f:
+                    for segment in segments:
+                        f.write(f"file '{os.path.join(task_dir, segment)}'\n")
+                
+                # Use ffmpeg to concatenate segments into an MP4 file
+                try:
+                    import subprocess
+                    cmd = [
+                        'ffmpeg',
+                        '-y',  # Overwrite output file if it exists
+                        '-f', 'concat',
+                        '-safe', '0',
+                        '-i', segments_list_path,
+                        '-c', 'copy',
+                        '-movflags', '+faststart',
+                        processed_video_path
+                    ]
+                    
+                    app.logger.info(f"Running ffmpeg command: {' '.join(cmd)}")
+                    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    
+                    # Clean up segments list
+                    os.remove(segments_list_path)
+                    
+                    if os.path.exists(processed_video_path):
+                        app.logger.info(f"Successfully created and serving processed video: {processed_video_path}")
+                        return send_file(
+                            processed_video_path,
+                            mimetype='video/mp4',
+                            as_attachment=True,
+                            download_name=f"detection_{task_id}.mp4"
+                        )
+                except Exception as e:
+                    app.logger.error(f"Error creating MP4 from HLS segments: {e}", exc_info=True)
+        
+        # If we get here, no valid processed video was found
+        app.logger.error(f"No processed video found for task {task_id}")
+        return jsonify({'error': 'No processed video found for this task'}), 404
+        
+    except Exception as e:
+        app.logger.error(f"Error downloading processed video: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Error downloading video: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

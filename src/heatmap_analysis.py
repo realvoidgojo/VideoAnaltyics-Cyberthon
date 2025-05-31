@@ -40,7 +40,17 @@ def generate_heatmap_video(video_path, output_path=None, task_instance=None):
     
     logger.info(f"Generating heatmap video from {video_path} to {output_path}")
     
+    if not os.path.exists(video_path):
+        error_msg = f"Video file not found: {video_path}"
+        logger.error(error_msg)
+        raise FileNotFoundError(error_msg)
+    
     capture = cv2.VideoCapture(video_path)
+    if not capture.isOpened():
+        error_msg = f"Failed to open video file: {video_path}"
+        logger.error(error_msg)
+        raise IOError(error_msg)
+        
     length = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     background_subtractor = cv2.bgsegm.createBackgroundSubtractorMOG()
 
@@ -48,94 +58,76 @@ def generate_heatmap_video(video_path, output_path=None, task_instance=None):
     fps = capture.get(cv2.CAP_PROP_FPS)
     if fps <= 0:
         fps = 30.0  # Default to 30 fps if can't determine
+        logger.warning(f"Invalid FPS detected, using default value: {fps}")
         
     width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
-    # Create video writer
-    # Try H.264 codec for MP4 (better browser compatibility)
-    logger.info("Using H.264 codec for video encoding (better browser compatibility)")
-    output_path = os.path.splitext(output_path)[0] + '.mp4'
-    logger.info(f"Using MP4 format: {output_path}")
+    logger.info(f"Video properties: {width}x{height}, {fps} FPS, {length} frames")
+    
+    # Create video writer with multiple codec fallbacks
+    video_writer = None
     
     # Try different codec options for H.264 encoding
-    try:
-        # First try 'avc1' - H.264 codec that works in most browsers
-        fourcc = cv2.VideoWriter_fourcc(*'avc1')
-        video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-        
-        if not video_writer.isOpened():
-            # If avc1 fails, try 'H264'
-            logger.warning("Failed to initialize VideoWriter with 'avc1' codec. Trying 'H264'...")
-            fourcc = cv2.VideoWriter_fourcc(*'H264')
-            video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    codecs_to_try = ['avc1', 'H264', 'X264', 'mp4v']
+    
+    for codec in codecs_to_try:
+        try:
+            fourcc = cv2.VideoWriter_fourcc(*codec)
+            file_extension = '.mp4'
+            file_path = os.path.splitext(output_path)[0] + file_extension
             
-        if not video_writer.isOpened():
-            # If H264 fails, try 'X264'
-            logger.warning("Failed to initialize VideoWriter with 'H264' codec. Trying 'X264'...")
-            fourcc = cv2.VideoWriter_fourcc(*'X264')
-            video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            logger.info(f"Trying codec {codec} with file {file_path}")
             
-        if not video_writer.isOpened():
-            # If all H.264 variants fail, fall back to mp4v
-            logger.warning("Failed to initialize VideoWriter with H.264 codecs. Falling back to mp4v...")
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            video_writer = cv2.VideoWriter(file_path, fourcc, fps, (width, height))
             
-        if not video_writer.isOpened():
-            # Last resort: try MJPG with AVI container
-            logger.warning("Failed to initialize VideoWriter with mp4v codec. Trying MJPG with AVI container...")
-            output_path = os.path.splitext(output_path)[0] + '.avi'
+            if video_writer.isOpened():
+                output_path = file_path
+                logger.info(f"Successfully initialized VideoWriter with codec: {codec}")
+                break
+        except Exception as e:
+            logger.warning(f"Failed with codec {codec}: {e}")
+    
+    # Last resort: try MJPG with AVI container
+    if video_writer is None or not video_writer.isOpened():
+        try:
+            logger.warning("Falling back to MJPG with AVI container")
+            file_path = os.path.splitext(output_path)[0] + '.avi'
             fourcc = cv2.VideoWriter_fourcc(*"MJPG")
-            video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-            
-        if not video_writer.isOpened():
-            raise Exception("Failed to initialize VideoWriter with any codec")
-            
-    except Exception as e:
-        logger.error(f"Error initializing video writer: {e}")
-        # Fall back to MJPG with AVI container as last resort
-        logger.warning("Falling back to MJPG with AVI container due to error...")
-        output_path = os.path.splitext(output_path)[0] + '.avi'
-        fourcc = cv2.VideoWriter_fourcc(*"MJPG")
-        video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-        
-        if not video_writer.isOpened():
-            raise Exception("Failed to initialize VideoWriter with any codec")
+            video_writer = cv2.VideoWriter(file_path, fourcc, fps, (width, height))
+            output_path = file_path
+        except Exception as e:
+            logger.error(f"Failed to initialize VideoWriter with MJPG: {e}")
+            raise RuntimeError(f"Could not initialize any video codec: {e}")
     
-    bar = Bar('Processing Frames for Heatmap Video', max=length)
-    first_iteration = True
+    if not video_writer or not video_writer.isOpened():
+        error_msg = "Failed to initialize VideoWriter with any codec"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
     
-    # Check for task cancellation before starting loop
-    if task_instance and hasattr(task_instance, 'request'):
-        if hasattr(task_instance.request, 'id'):
-            from .celery import celery_app
-            task_id = task_instance.request.id
-            task_result = celery_app.AsyncResult(task_id)
-            if task_result.state == 'REVOKED':
-                logger.warning(f"Task {task_id} was cancelled - stopping heatmap video generation")
-                raise Exception("Task cancelled by user")
+    logger.info(f"Starting heatmap video generation with output: {output_path}")
     
     try:
-        for i in range(length):
-            # Check for task cancellation every 10 frames
-            if i % 10 == 0 and task_instance and hasattr(task_instance, 'request'):
-                # Check if the task is revoked
+        # Initialize progress bar
+        bar = Bar('Processing Frames for Heatmap Video', max=length)
+        accum_image = np.zeros((height, width), np.uint8)
+        frame_count = 0
+        
+        while True:
+            # Check for cancellation every 30 frames
+            if frame_count % 30 == 0 and task_instance and hasattr(task_instance, 'request'):
                 if hasattr(task_instance.request, 'id'):
                     from .celery import celery_app
                     task_id = task_instance.request.id
                     task_result = celery_app.AsyncResult(task_id)
-                    if task_result.state == 'REVOKED':
+                    if task_result and task_result.state == 'REVOKED':
                         logger.warning(f"Task {task_id} was cancelled - stopping heatmap video generation")
-                        # Make sure the exception message matches exactly what the frontend is expecting
-                        raise Exception("Task cancelled by user")
+                        raise TaskCancelledError("Task cancelled by user")
+            
             ret, frame = capture.read()
             if not ret:
                 break
-            if first_iteration:
-                accum_image = np.zeros((height, width), np.uint8)
-                first_iteration = False
-            
+                
             filter_mask = background_subtractor.apply(frame)
             _, thresholded = cv2.threshold(filter_mask, 2, 2, cv2.THRESH_BINARY)
             accum_image = cv2.add(accum_image, thresholded)
@@ -145,25 +137,40 @@ def generate_heatmap_video(video_path, output_path=None, task_instance=None):
             
             video_writer.write(result_overlay)
             bar.next()
+            frame_count += 1
+            
+            # Report progress if task_instance is provided
+            if frame_count % 30 == 0 and task_instance and hasattr(task_instance, 'update_state'):
+                progress = min(99, int(100 * frame_count / length)) if length > 0 else 0
+                task_instance.update_state(state='PROGRESS', meta={
+                    'status': f'Generating heatmap video ({progress}%)',
+                    'percent': progress
+                })
+                
+    except TaskCancelledError:
+        # Clean up resources
+        logger.warning("Task cancelled, cleaning up resources")
+        capture.release()
+        video_writer.release()
+        # Re-raise for proper handling
+        raise
     except Exception as e:
-        logger.error(f"Error generating heatmap video: {e}")
+        logger.error(f"Error generating heatmap video: {str(e)}", exc_info=True)
         raise
     finally:
         bar.finish()
         capture.release()
-        video_writer.release()
+        if video_writer:
+            video_writer.release()
     
     # Verify the video was created successfully
     if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
         logger.info(f"Heatmap video generated successfully at {output_path} ({os.path.getsize(output_path)} bytes)")
+        return output_path
     else:
-        logger.error(f"Failed to generate heatmap video at {output_path}")
-        if os.path.exists(output_path):
-            logger.error(f"File exists but is empty ({os.path.getsize(output_path)} bytes)")
-        else:
-            logger.error("File does not exist")
-    
-    return output_path
+        error_msg = f"Failed to generate heatmap video at {output_path}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
 
 # Define a custom exception class for task cancellation
 class TaskCancelledError(Exception):
@@ -171,220 +178,236 @@ class TaskCancelledError(Exception):
     pass
 
 def generate_heatmap_frames(video_path, frame_interval=1, task_instance=None):
-    """
-    Processes a video and generates frames with heatmap overlay at specified intervals.
-    Returns a list of base64 encoded frames with heatmap applied.
-    
-    Args:
-        video_path: Path to the video file
-        frame_interval: Interval at which to save frames
-        task_instance: Celery task instance for checking cancellation
-    """
-    logger.info(f"Generating heatmap frames from {video_path} with interval {frame_interval}")
-    
-    capture = cv2.VideoCapture(video_path)
-    length = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-    background_subtractor = cv2.bgsegm.createBackgroundSubtractorMOG()
-    
-    # Get video properties
-    width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = capture.get(cv2.CAP_PROP_FPS)
-    if fps <= 0:
-        fps = 30.0  # Default to 30 fps if can't determine
-    
-    bar = Bar('Processing Heatmap Frames', max=length)
-    
-    # Initialize accumulator image
-    accum_image = np.zeros((height, width), np.uint8)
-    heatmap_frames = []
-    frame_count = 0
-    
-    # Generate heatmap analysis data
-    movement_intensity = []
-    movement_regions = []
-    frame_timestamps = []
-    
-    while True:
-        # Check for task cancellation if task_instance is provided
+    """Generate heatmap frames from video with improved error handling"""
+    try:
+        if task_instance:
+            task_instance.update_state(state='PROGRESS', meta={
+                'status': 'Analyzing video for heatmap generation',
+                'percent': 10
+            })
+            
+        # Check if video file exists
+        if not os.path.exists(video_path):
+            raise FileNotFoundError(f"Video file not found: {video_path}")
+        
+        logger.info(f"Generating heatmap frames from {video_path} with interval {frame_interval}")
+        
+        capture = cv2.VideoCapture(video_path)
+        length = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        background_subtractor = cv2.bgsegm.createBackgroundSubtractorMOG()
+        
+        # Get video properties
+        width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = capture.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            fps = 30.0  # Default to 30 fps if can't determine
+        
+        bar = Bar('Processing Heatmap Frames', max=length)
+        
+        # Initialize accumulator image
+        accum_image = np.zeros((height, width), np.uint8)
+        heatmap_frames = []
+        frame_count = 0
+        
+        # Generate heatmap analysis data
+        movement_intensity = []
+        movement_regions = []
+        frame_timestamps = []
+        
+        while True:
+            # Check for task cancellation if task_instance is provided
+            if task_instance and hasattr(task_instance, 'request'):
+                # Check if the task is revoked
+                if hasattr(task_instance.request, 'id'):
+                    from .celery import celery_app
+                    task_id = task_instance.request.id
+                    task_result = celery_app.AsyncResult(task_id)
+                    if task_result.state == 'REVOKED':
+                        logger.warning(f"Task {task_id} was cancelled - stopping heatmap generation")
+                        # Make sure the exception message matches exactly what the frontend is expecting
+                        # Raise our custom exception instead of a generic Exception
+                        capture.release()
+                        bar.finish()
+                        raise TaskCancelledError("Task cancelled by user")
+                
+            ret, frame = capture.read()
+            if not ret:
+                break
+                
+            # Check for task cancellation every 10 frames
+            if frame_count % 10 == 0 and task_instance and hasattr(task_instance, 'request'):
+                if hasattr(task_instance.request, 'id'):
+                    from .celery import celery_app
+                    task_id = task_instance.request.id
+                    task_result = celery_app.AsyncResult(task_id)
+                    if task_result.state == 'REVOKED':
+                        logger.warning(f"Task {task_id} was cancelled after {frame_count} frames - stopping heatmap generation")
+                        # Clean up resources
+                        bar.finish()
+                        capture.release()
+                        # Make sure the exception message matches exactly what the frontend is expecting
+                        raise TaskCancelledError("Task cancelled by user")
+                
+            # Process every frame to update the accumulator
+            filter_mask = background_subtractor.apply(frame)
+            _, thresholded = cv2.threshold(filter_mask, 2, 2, cv2.THRESH_BINARY)
+            accum_image = cv2.add(accum_image, thresholded)
+            
+            # Calculate movement intensity (white pixel percentage)
+            white_pixels = cv2.countNonZero(thresholded)
+            total_pixels = width * height
+            intensity = (white_pixels / total_pixels) * 100
+            movement_intensity.append(intensity)
+            
+            # Calculate movement regions
+            contours, _ = cv2.findContours(thresholded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            regions = []
+            for contour in contours:
+                if cv2.contourArea(contour) > 100:  # Filter out small noise
+                    x, y, w, h = cv2.boundingRect(contour)
+                    regions.append({"x": int(x), "y": int(y), "width": int(w), "height": int(h)})
+            
+            movement_regions.append(regions)
+            try:
+                current_fps = capture.get(cv2.CAP_PROP_FPS)
+                if current_fps <= 0:
+                    current_fps = fps  # Use the fps we saved at the beginning
+                
+                frame_time = frame_count / current_fps if current_fps > 0 else frame_count / 30.0
+                frame_timestamps.append(frame_time)
+            except Exception as e:
+                logger.warning(f"Error calculating frame timestamp: {e}")
+                # Fallback to frame count in seconds at 30fps
+                frame_timestamps.append(frame_count / 30.0)
+            
+            # Only save frames at the specified interval
+            if frame_count % frame_interval == 0:
+                # Create heatmap overlay
+                overlay = cv2.applyColorMap(accum_image, cv2.COLORMAP_HOT)
+                result_overlay = cv2.addWeighted(frame, 0.7, overlay, 0.7, 0)
+                
+                # Convert to base64 for sending to frontend
+                _, buffer = cv2.imencode('.jpg', result_overlay)
+                encoded_frame = base64.b64encode(buffer).decode('utf-8')
+                heatmap_frames.append(encoded_frame)
+                
+                # Update task progress if task_instance is provided
+                if task_instance and frame_count % 10 == 0:  # Update every 10 frames
+                    progress = int((frame_count / length) * 100) if length > 0 else 0
+                    if hasattr(task_instance, 'update_state'):
+                        task_instance.update_state(
+                            state='PROGRESS', 
+                            meta={
+                                'status': f'Generating heatmap analysis ({progress}%)',
+                                'percent': progress
+                            }
+                        )
+            
+            frame_count += 1
+            bar.next()
+        
+        bar.finish()
+        capture.release()
+        
+        # Generate analysis summary
+        # Add detailed debug logging
+        logger.info(f"Generating analysis: len(movement_intensity)={len(movement_intensity) if movement_intensity else 0}, fps={fps}, length={length}")
+        
+        peak_time = 0
+        avg_intensity = 0
+        
+        # Check task cancellation one more time before analysis
         if task_instance and hasattr(task_instance, 'request'):
-            # Check if the task is revoked
             if hasattr(task_instance.request, 'id'):
                 from .celery import celery_app
                 task_id = task_instance.request.id
                 task_result = celery_app.AsyncResult(task_id)
                 if task_result.state == 'REVOKED':
-                    logger.warning(f"Task {task_id} was cancelled - stopping heatmap generation")
+                    logger.warning(f"Task {task_id} was cancelled before analysis - stopping heatmap generation")
                     # Make sure the exception message matches exactly what the frontend is expecting
-                    # Raise our custom exception instead of a generic Exception
-                    capture.release()
-                    bar.finish()
                     raise TaskCancelledError("Task cancelled by user")
+        
+        # Calculate peak time safely
+        if movement_intensity and len(movement_intensity) > 0:
+            try:
+                max_value = max(movement_intensity)
+                logger.info(f"Max intensity value: {max_value}")
+                max_intensity_index = movement_intensity.index(max_value)
+                logger.info(f"Max intensity index: {max_intensity_index}, len(frame_timestamps)={len(frame_timestamps)}")
                 
-        ret, frame = capture.read()
-        if not ret:
-            break
-            
-        # Check for task cancellation every 10 frames
-        if frame_count % 10 == 0 and task_instance and hasattr(task_instance, 'request'):
-            if hasattr(task_instance.request, 'id'):
-                from .celery import celery_app
-                task_id = task_instance.request.id
-                task_result = celery_app.AsyncResult(task_id)
-                if task_result.state == 'REVOKED':
-                    logger.warning(f"Task {task_id} was cancelled after {frame_count} frames - stopping heatmap generation")
-                    # Clean up resources
-                    bar.finish()
-                    capture.release()
-                    # Make sure the exception message matches exactly what the frontend is expecting
-                    raise TaskCancelledError("Task cancelled by user")
-            
-        # Process every frame to update the accumulator
-        filter_mask = background_subtractor.apply(frame)
-        _, thresholded = cv2.threshold(filter_mask, 2, 2, cv2.THRESH_BINARY)
-        accum_image = cv2.add(accum_image, thresholded)
-        
-        # Calculate movement intensity (white pixel percentage)
-        white_pixels = cv2.countNonZero(thresholded)
-        total_pixels = width * height
-        intensity = (white_pixels / total_pixels) * 100
-        movement_intensity.append(intensity)
-        
-        # Calculate movement regions
-        contours, _ = cv2.findContours(thresholded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        regions = []
-        for contour in contours:
-            if cv2.contourArea(contour) > 100:  # Filter out small noise
-                x, y, w, h = cv2.boundingRect(contour)
-                regions.append({"x": int(x), "y": int(y), "width": int(w), "height": int(h)})
-        
-        movement_regions.append(regions)
+                if frame_timestamps and max_intensity_index < len(frame_timestamps):
+                    peak_time = frame_timestamps[max_intensity_index]
+                    logger.info(f"Peak time set to: {peak_time}")
+                else:
+                    logger.warning(f"Invalid index or empty frame_timestamps: index={max_intensity_index}, len(timestamps)={len(frame_timestamps) if frame_timestamps else 0}")
+                    
+                if len(movement_intensity) > 0:
+                    avg_intensity = sum(movement_intensity) / len(movement_intensity)
+                    logger.info(f"Average intensity: {avg_intensity}")
+                else:
+                    logger.warning("Movement intensity array is empty, can't calculate average")
+                
+            except (ValueError, ZeroDivisionError) as e:
+                logger.warning(f"Error calculating heatmap analytics: {e}")
+                
+        # Calculate movement duration
+        movement_duration = 0
         try:
-            current_fps = capture.get(cv2.CAP_PROP_FPS)
-            if current_fps <= 0:
-                current_fps = fps  # Use the fps we saved at the beginning
+            if movement_intensity and fps > 0:
+                movements = [i for i in movement_intensity if i > 1]
+                logger.info(f"Movement count: {len(movements)}, fps: {fps}")
+                movement_duration = len(movements) / fps
+                logger.info(f"Movement duration: {movement_duration}")
+        except ZeroDivisionError:
+            logger.warning("FPS is zero, cannot calculate movement duration")
             
-            frame_time = frame_count / current_fps if current_fps > 0 else frame_count / 30.0
-            frame_timestamps.append(frame_time)
+        # Calculate total duration
+        total_duration = 0
+        try:
+            if fps > 0 and length > 0:
+                total_duration = length / fps
+                logger.info(f"Total duration: {total_duration}")
+        except ZeroDivisionError:
+            logger.warning("FPS is zero, cannot calculate total duration")
+        
+        try:
+            analysis = {
+                "frames": heatmap_frames if heatmap_frames else [],
+                "movement_intensity": movement_intensity if movement_intensity else [],
+                "peak_movement_time": peak_time,
+                "average_intensity": avg_intensity,
+                "movement_duration": movement_duration,
+                "total_duration": total_duration
+            }
+            logger.info("Successfully created analysis result dictionary")
         except Exception as e:
-            logger.warning(f"Error calculating frame timestamp: {e}")
-            # Fallback to frame count in seconds at 30fps
-            frame_timestamps.append(frame_count / 30.0)
+            logger.error(f"Error creating analysis dictionary: {e}")
+            # Create a minimal analysis object as fallback
+            analysis = {
+                "frames": heatmap_frames if heatmap_frames else [],
+                "movement_intensity": [],
+                "peak_movement_time": 0,
+                "average_intensity": 0,
+                "movement_duration": 0,
+                "total_duration": 0
+            }
         
-        # Only save frames at the specified interval
-        if frame_count % frame_interval == 0:
-            # Create heatmap overlay
-            overlay = cv2.applyColorMap(accum_image, cv2.COLORMAP_HOT)
-            result_overlay = cv2.addWeighted(frame, 0.7, overlay, 0.7, 0)
-            
-            # Convert to base64 for sending to frontend
-            _, buffer = cv2.imencode('.jpg', result_overlay)
-            encoded_frame = base64.b64encode(buffer).decode('utf-8')
-            heatmap_frames.append(encoded_frame)
-            
-            # Update task progress if task_instance is provided
-            if task_instance and frame_count % 10 == 0:  # Update every 10 frames
-                progress = int((frame_count / length) * 100) if length > 0 else 0
-                if hasattr(task_instance, 'update_state'):
-                    task_instance.update_state(
-                        state='PROGRESS', 
-                        meta={
-                            'status': f'Generating heatmap analysis ({progress}%)',
-                            'percent': progress
-                        }
-                    )
-            
-        frame_count += 1
-        bar.next()
-    
-    bar.finish()
-    capture.release()
-    
-    # Generate analysis summary
-    # Add detailed debug logging
-    logger.info(f"Generating analysis: len(movement_intensity)={len(movement_intensity) if movement_intensity else 0}, fps={fps}, length={length}")
-    
-    peak_time = 0
-    avg_intensity = 0
-    
-    # Check task cancellation one more time before analysis
-    if task_instance and hasattr(task_instance, 'request'):
-        if hasattr(task_instance.request, 'id'):
-            from .celery import celery_app
-            task_id = task_instance.request.id
-            task_result = celery_app.AsyncResult(task_id)
-            if task_result.state == 'REVOKED':
-                logger.warning(f"Task {task_id} was cancelled before analysis - stopping heatmap generation")
-                # Make sure the exception message matches exactly what the frontend is expecting
-                raise TaskCancelledError("Task cancelled by user")
-    
-    # Calculate peak time safely
-    if movement_intensity and len(movement_intensity) > 0:
-        try:
-            max_value = max(movement_intensity)
-            logger.info(f"Max intensity value: {max_value}")
-            max_intensity_index = movement_intensity.index(max_value)
-            logger.info(f"Max intensity index: {max_intensity_index}, len(frame_timestamps)={len(frame_timestamps)}")
-            
-            if frame_timestamps and max_intensity_index < len(frame_timestamps):
-                peak_time = frame_timestamps[max_intensity_index]
-                logger.info(f"Peak time set to: {peak_time}")
-            else:
-                logger.warning(f"Invalid index or empty frame_timestamps: index={max_intensity_index}, len(timestamps)={len(frame_timestamps) if frame_timestamps else 0}")
-                
-            if len(movement_intensity) > 0:
-                avg_intensity = sum(movement_intensity) / len(movement_intensity)
-                logger.info(f"Average intensity: {avg_intensity}")
-            else:
-                logger.warning("Movement intensity array is empty, can't calculate average")
-                
-        except (ValueError, ZeroDivisionError) as e:
-            logger.warning(f"Error calculating heatmap analytics: {e}")
-            
-    # Calculate movement duration
-    movement_duration = 0
-    try:
-        if movement_intensity and fps > 0:
-            movements = [i for i in movement_intensity if i > 1]
-            logger.info(f"Movement count: {len(movements)}, fps: {fps}")
-            movement_duration = len(movements) / fps
-            logger.info(f"Movement duration: {movement_duration}")
-    except ZeroDivisionError:
-        logger.warning("FPS is zero, cannot calculate movement duration")
-        
-    # Calculate total duration
-    total_duration = 0
-    try:
-        if fps > 0 and length > 0:
-            total_duration = length / fps
-            logger.info(f"Total duration: {total_duration}")
-    except ZeroDivisionError:
-        logger.warning("FPS is zero, cannot calculate total duration")
-    
-    try:
-        analysis = {
-            "frames": heatmap_frames if heatmap_frames else [],
-            "movement_intensity": movement_intensity if movement_intensity else [],
-            "peak_movement_time": peak_time,
-            "average_intensity": avg_intensity,
-            "movement_duration": movement_duration,
-            "total_duration": total_duration
-        }
-        logger.info("Successfully created analysis result dictionary")
+        logger.info(f"Heatmap analysis generated with {len(heatmap_frames)} frames")
+        return analysis
     except Exception as e:
-        logger.error(f"Error creating analysis dictionary: {e}")
-        # Create a minimal analysis object as fallback
-        analysis = {
-            "frames": heatmap_frames if heatmap_frames else [],
-            "movement_intensity": [],
-            "peak_movement_time": 0,
-            "average_intensity": 0,
-            "movement_duration": 0,
-            "total_duration": 0
+        logger.error(f"Error generating heatmap: {str(e)}", exc_info=True)
+        
+        # Return a structured error response
+        return {
+            'error': str(e),
+            'frames': [],
+            'peak_movement_time': 0,
+            'average_intensity': 0,
+            'movement_duration': 0,
+            'total_duration': 0,
+            'success': False
         }
-    
-    logger.info(f"Heatmap analysis generated with {len(heatmap_frames)} frames")
-    return analysis
 
 # Add this function after the generate_heatmap_video function
 
