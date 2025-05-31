@@ -22,20 +22,21 @@ import axios from "axios";
 const JobCard = ({ job }) => {
   const { updateJob, removeJob, toggleHeatmapView } = useJobContext();
 
-  // We only need to track server task ID, progress, and status
+  // State for tracking processing status
   const [progress, setProgress] = useState(0);
   const [processingStage, setProcessingStage] = useState("");
   const [estimatedTimeLeft, setEstimatedTimeLeft] = useState(null);
   const [isProcessing, setIsProcessing] = useState(true);
   const processingStartTime = useRef(null);
 
-  // Get heatmap data from the server
+  // Get detection data from the server
   const {
     objectFrequency,
     useHeatmap: hasHeatmapData,
     heatmapAnalysis,
   } = useDetections(job.serverTaskId);
 
+  // Initialize processing time tracking
   useEffect(() => {
     if (isProcessing && !processingStartTime.current) {
       processingStartTime.current = new Date();
@@ -45,11 +46,12 @@ const JobCard = ({ job }) => {
     }
   }, [isProcessing]);
 
+  // Poll for task status
   useEffect(() => {
     if (!job.serverTaskId) return;
 
     let intervalId;
-    const pollInterval = 2000; // Poll every 2 seconds
+    const pollInterval = 2000;
     let consecutiveErrorCount = 0;
     const maxErrorCount = 3;
 
@@ -94,32 +96,27 @@ const JobCard = ({ job }) => {
           const remainingMs = totalEstimatedMs - elapsedMs;
 
           if (remainingMs > 0) {
-            // Update time estimation but smooth the changes to avoid jumps
+            // Smooth the time estimate
             const seconds = Math.round(remainingMs / 1000);
-            setEstimatedTimeLeft((prevTime) => {
-              // Smooth the time estimate by averaging with previous value
-              return prevTime ? Math.round((prevTime + seconds) / 2) : seconds;
-            });
+            setEstimatedTimeLeft((prevTime) =>
+              prevTime ? Math.round((prevTime + seconds) / 2) : seconds
+            );
           }
         }
       } catch (error) {
         console.error("Error polling task status:", error);
         consecutiveErrorCount++;
 
-        // If we've had multiple consecutive errors, stop polling
         if (consecutiveErrorCount >= maxErrorCount && intervalId) {
           clearInterval(intervalId);
-          intervalId = null;
           setProcessingStage("Connection lost to server");
         }
       }
     };
 
-    // Poll immediately then start interval
     pollTaskStatus();
     intervalId = setInterval(pollTaskStatus, pollInterval);
 
-    // Clean up interval on unmount
     return () => {
       if (intervalId) {
         clearInterval(intervalId);
@@ -134,6 +131,10 @@ const JobCard = ({ job }) => {
   const handleToggleHeatmapView = () => {
     toggleHeatmapView(job.id);
   };
+
+  // Check if heatmap mode should be available
+  // FIXED: Only allow heatmap mode if user requested it in the form
+  const heatmapModeAvailable = job.useHeatmap === true && hasHeatmapData;
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg border border-gray-200">
@@ -159,46 +160,60 @@ const JobCard = ({ job }) => {
           </div>
           <ProgressBar
             progress={progress}
-            currentPhase={job.showHeatmap ? 1 : 2}
+            processingStage={processingStage}
+            estimatedTimeLeft={estimatedTimeLeft}
+            useHeatmap={job.useHeatmap}
           />
         </div>
       )}
 
-      {/* View Mode Selector with improved styling */}
-      <div className="flex p-3 bg-gray-50 border-t border-b border-gray-200">
-        <div
-          className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg cursor-pointer transition-all ${
-            !job.showHeatmap
-              ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium shadow-md"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-          }`}
-          onClick={() => job.showHeatmap && handleToggleHeatmapView()}
-          role="button"
-          tabIndex={0}
-        >
-          <VideoIcon className="h-5 w-5 mr-2" />
-          <span className="font-medium">Object Detection</span>
-        </div>
+      {/* FIXED: Only show view mode selector if heatmap was requested */}
+      {heatmapModeAvailable ? (
+        <div className="flex p-3 bg-gray-50 border-t border-b border-gray-200">
+          <div
+            className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg cursor-pointer transition-all ${
+              !job.showHeatmap
+                ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium shadow-md"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+            onClick={() => job.showHeatmap && handleToggleHeatmapView()}
+            role="button"
+            tabIndex={0}
+          >
+            <VideoIcon className="h-5 w-5 mr-2" />
+            <span className="font-medium">Object Detection</span>
+          </div>
 
-        <div className="mx-2"></div>
+          <div className="mx-2"></div>
 
-        <div
-          className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg cursor-pointer transition-all ${
-            job.showHeatmap
-              ? "bg-gradient-to-r from-green-500 to-green-600 text-white font-medium shadow-md"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-          }`}
-          onClick={() => !job.showHeatmap && handleToggleHeatmapView()}
-          role="button"
-          tabIndex={0}
-        >
-          <Activity className="h-5 w-5 mr-2" />
-          <span className="font-medium">Heatmap Analysis</span>
+          <div
+            className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg cursor-pointer transition-all ${
+              job.showHeatmap
+                ? "bg-gradient-to-r from-green-500 to-green-600 text-white font-medium shadow-md"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+            onClick={() => !job.showHeatmap && handleToggleHeatmapView()}
+            role="button"
+            tabIndex={0}
+          >
+            <Activity className="h-5 w-5 mr-2" />
+            <span className="font-medium">Heatmap Analysis</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        // When heatmap was not requested, show a simpler header
+        <div className="p-3 bg-gray-50 border-t border-b border-gray-200">
+          <div className="flex-1 flex items-center px-4 py-2">
+            <VideoIcon className="h-5 w-5 mr-2 text-blue-500" />
+            <span className="font-medium text-blue-700">
+              Object Detection Results
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Conditional rendering based on view mode */}
-      {job.showHeatmap ? (
+      {heatmapModeAvailable && job.showHeatmap ? (
         <HeatmapViewSection
           taskID={job.serverTaskId}
           job={job}

@@ -20,30 +20,34 @@ const Select = ({
   ...props
 }) => {
   // Generate an ID if not provided
-  const selectId = id || name || `select-${Math.random().toString(36).substring(2, 9)}`;
-  
+  const selectId =
+    id || name || `select-${Math.random().toString(36).substring(2, 9)}`;
+
   return (
     <div className={`mb-4 ${containerClassName}`}>
       {label && (
-        <label 
-          htmlFor={selectId} 
+        <label
+          htmlFor={selectId}
           className={`block text-sm font-medium text-gray-700 mb-1 ${labelClassName}`}
         >
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
-      
+
       <select
         id={selectId}
         name={name}
         value={value}
-        onChange={onChange}
+        onChange={(e) => {
+          // Ensure we're always passing an event-like object
+          onChange(e);
+        }}
         disabled={disabled}
         className={`
           w-full px-3 py-2 bg-white border rounded-lg appearance-none
-          ${error ? 'border-red-500' : 'border-gray-300'}
-          ${disabled ? 'bg-gray-100 text-gray-500' : 'text-gray-900'}
+          ${error ? "border-red-500" : "border-gray-300"}
+          ${disabled ? "bg-gray-100 text-gray-500" : "text-gray-900"}
           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
           transition-colors duration-200
           ${selectClassName}
@@ -55,27 +59,36 @@ const Select = ({
             {placeholder}
           </option>
         )}
-        
+
         {options.map((option) => (
-          <option 
-            key={option.value} 
-            value={option.value}
-            className="py-2"
-          >
+          <option key={option.value} value={option.value} className="py-2">
             {option.label}
           </option>
         ))}
       </select>
-      
+
       {/* Custom dropdown arrow */}
       <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+        <svg
+          className="w-5 h-5 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M19 9l-7 7-7-7"
+          ></path>
         </svg>
       </div>
-      
+
       {(error || helperText) && (
-        <p className={`mt-1 text-sm ${error ? 'text-red-600' : 'text-gray-500'}`}>
+        <p
+          className={`mt-1 text-sm ${error ? "text-red-600" : "text-gray-500"}`}
+        >
           {error || helperText}
         </p>
       )}
@@ -89,7 +102,8 @@ Select.propTypes = {
   onChange: PropTypes.func.isRequired,
   options: PropTypes.arrayOf(
     PropTypes.shape({
-      value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+      value: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+        .isRequired,
       label: PropTypes.string.isRequired,
     })
   ),
