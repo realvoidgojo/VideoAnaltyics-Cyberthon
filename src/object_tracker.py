@@ -53,10 +53,18 @@ class ObjectTracker:
         self.disappeared_counts: Dict[int, int] = defaultdict(int)
         self.frame_count = 0
         
-        # Frequency tracking - enhanced to prevent duplicates
+        # Enhanced frequency tracking based on spatial uniqueness
         self.unique_object_frequencies: Dict[str, int] = defaultdict(int)
         self.seen_objects: set = set()  # Track unique objects by (class, id)
         self.class_track_history: Dict[str, set] = defaultdict(set)  # Track all track IDs per class
+        
+        # Enhanced frequency tracking to prevent duplicate counting of moving objects
+        self.unique_object_positions: Dict[str, List[Tuple[float, float]]] = defaultdict(list)
+        self.spatial_threshold = 100.0  # Minimum distance between unique objects of same class
+        
+        # Track object lifespans to better handle frequency counting
+        self.object_lifespans: Dict[int, Dict] = {}  # track_id -> {class_name, birth_frame, counted}
+        self.counted_objects: set = set()  # Track which objects we've already counted
         
         logger.info(f"ObjectTracker initialized with IoU threshold: {iou_threshold}")
     
@@ -139,7 +147,7 @@ class ObjectTracker:
         return results
     
     def _create_new_track(self, detection: Dict) -> int:
-        """Create a new track for an unmatched detection with enhanced duplicate prevention"""
+        """Create a new track for an unmatched detection with improved duplicate prevention"""
         track_id = self.next_object_id
         self.next_object_id += 1
         
@@ -161,15 +169,28 @@ class ObjectTracker:
         self.tracked_objects[track_id] = tracked_obj
         self.disappeared_counts[track_id] = 0
         
-        # Enhanced frequency counting with better duplicate prevention
-        object_key = f"{class_name}_{track_id}"
-        if object_key not in self.seen_objects:
-            self.seen_objects.add(object_key)
-            self.class_track_history[class_name].add(track_id)
+        # Enhanced frequency counting approach
+        should_count = self._should_count_as_new_object(detection, track_id)
+        
+        if should_count:
             self.unique_object_frequencies[class_name] += 1
-            logger.info(f"New unique {class_name} detected with ID {track_id} (Total {class_name}s: {self.unique_object_frequencies[class_name]})")
+            self.counted_objects.add(track_id)
+            logger.info(f"New unique {class_name} with ID {track_id} (Total: {self.unique_object_frequencies[class_name]})")
         else:
-            logger.warning(f"Duplicate object key detected: {object_key} - Not counting again")
+            logger.info(f"Track ID {track_id} for {class_name} - not counting (likely duplicate/recovery)")
+        
+        # Record object lifespan
+        self.object_lifespans[track_id] = {
+            'class_name': class_name,
+            'birth_frame': self.frame_count,
+            'counted': should_count,
+            'initial_position': center
+        }
+        
+        # Always track the object key for debugging
+        object_key = f"{class_name}_{track_id}"
+        self.seen_objects.add(object_key)
+        self.class_track_history[class_name].add(track_id)
         
         return track_id
     
@@ -210,6 +231,74 @@ class ObjectTracker:
                     return True
         
         return False
+    
+    def _should_count_as_new_object(self, detection: Dict, track_id: int) -> bool:
+        """
+        Determine if a new detection should be counted as a new unique object.
+        Uses multiple criteria to prevent duplicate counting of moving objects.
+        """
+        bbox = detection['box']
+        center = ((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
+        class_name = detection['class_name']
+        
+        # Simple approach: Only count if this is genuinely in a new area
+        # AND there are no recently disappeared objects of the same class nearby
+        
+        # Check 1: Is there a recently disappeared track of the same class nearby?
+        recently_lost_tracks = self._get_recently_lost_tracks(class_name, frames_back=10)
+        for lost_track_info in recently_lost_tracks:
+            lost_center = lost_track_info['last_position']
+            distance = np.sqrt((center[0] - lost_center[0])**2 + (center[1] - lost_center[1])**2)
+            
+            # If this new detection is close to a recently lost track, it's probably the same object
+            if distance < self.spatial_threshold:
+                logger.debug(f"New {class_name} at {center} close to recently lost track (distance: {distance:.1f}px)")
+                return False
+        
+        # Check 2: Is there already an active track of same class nearby?
+        for existing_id, obj in self.tracked_objects.items():
+            if existing_id != track_id and obj.class_name == class_name:
+                distance = np.sqrt((center[0] - obj.center[0])**2 + (center[1] - obj.center[1])**2)
+                if distance < self.spatial_threshold:
+                    logger.debug(f"New {class_name} too close to existing track {existing_id} (distance: {distance:.1f}px)")
+                    return False
+        
+        # Check 3: Allow legitimate new objects but be conservative about rapid creation
+        recent_new_objects = len([
+            track_data for track_data in self.object_lifespans.values()
+            if (track_data['class_name'] == class_name and 
+                track_data['counted'] and 
+                (self.frame_count - track_data['birth_frame']) < 5)  # Only within last 5 frames
+        ])
+        
+        # Only block if we're seeing too many new objects in rapid succession
+        if recent_new_objects >= 3:  # Allow up to 3 new objects in 5 frames
+            logger.debug(f"Already counted {recent_new_objects} new {class_name}(s) in last 5 frames - being conservative")
+            return False
+        
+        logger.info(f"Counting new {class_name} at {center} as unique object")
+        return True
+    
+    def _get_recently_lost_tracks(self, class_name: str, frames_back: int = 15) -> List[Dict]:
+        """Get information about recently lost tracks of a specific class"""
+        recently_lost = []
+        cutoff_frame = max(0, self.frame_count - frames_back)
+        
+        for track_id, track_data in self.object_lifespans.items():
+            if (track_data['class_name'] == class_name and 
+                track_id not in self.tracked_objects and  # Track is no longer active
+                track_data['counted']):                   # Only consider objects that were counted
+                
+                # Check if this object was lost recently enough to matter
+                birth_frame = track_data['birth_frame']
+                if birth_frame >= cutoff_frame:
+                    recently_lost.append({
+                        'track_id': track_id,
+                        'last_position': track_data['initial_position'],
+                        'birth_frame': birth_frame
+                    })
+        
+        return recently_lost
     
     def _prepare_tracking_output(self) -> List[Dict]:
         """Prepare the final tracking output for current frame"""
@@ -339,6 +428,9 @@ class ObjectTracker:
         self.unique_object_frequencies.clear()
         self.seen_objects.clear()
         self.class_track_history.clear()
+        self.unique_object_positions.clear()
+        self.object_lifespans.clear()
+        self.counted_objects.clear()
         self.next_object_id = 1
         self.frame_count = 0
         logger.info("ObjectTracker reset")
@@ -352,5 +444,12 @@ class ObjectTracker:
             'class_frequencies': dict(self.unique_object_frequencies),
             'class_track_counts': {k: len(v) for k, v in self.class_track_history.items()},
             'active_track_ids': list(self.tracked_objects.keys()),
-            'disappeared_counts': dict(self.disappeared_counts)
-        } 
+            'disappeared_counts': dict(self.disappeared_counts),
+            'unique_positions_count': {k: len(v) for k, v in self.unique_object_positions.items()},
+            'spatial_threshold': self.spatial_threshold
+        }
+    
+    def set_spatial_threshold(self, threshold: float):
+        """Adjust the spatial threshold for unique object detection"""
+        self.spatial_threshold = threshold
+        logger.info(f"Spatial threshold updated to {threshold} pixels") 
