@@ -623,7 +623,7 @@ def get_server_side_status(task_id):
 
 @app.route('/get_detection_statistics/<task_id>', methods=['GET'])
 def get_detection_statistics(task_id):
-    """Get object detection statistics for a task with enhanced data"""
+    """Get enhanced object detection statistics with accurate tracking data"""
     try:
         if not task_id:
             return error_response("No task ID provided", 400)
@@ -640,7 +640,26 @@ def get_detection_statistics(task_id):
                 if not isinstance(result, dict):
                     continue
                 
-                # Extract object frequency data
+                # Try to get enhanced tracking data first
+                if 'tracking_summary' in result:
+                    tracking_summary = result['tracking_summary']
+                    object_frequency = tracking_summary.get('unique_object_frequencies', {})
+                    
+                    enhanced_data = {
+                        'object_frequency': object_frequency,
+                        'total_unique_objects': tracking_summary.get('total_unique_objects', 0),
+                        'active_tracks': tracking_summary.get('active_tracks', 0),
+                        'frames_processed': tracking_summary.get('frames_processed', 0),
+                        'class_distribution': tracking_summary.get('class_distribution', {}),
+                        'most_frequent': max(object_frequency.items(), key=lambda x: x[1])[0] if object_frequency else None,
+                        'tracking_enabled': True,
+                        'data_accuracy': 'High - Uses enhanced object tracking with consistent IDs'
+                    }
+                    
+                    app.logger.info(f"Returning enhanced tracking statistics for task {task_id}")
+                    return jsonify(enhanced_data)
+                
+                # Fallback to legacy object frequency data
                 object_frequency = result.get('object_frequency', {})
                 
                 if not object_frequency:
@@ -661,9 +680,12 @@ def get_detection_statistics(task_id):
                         }
                         for class_name, count in object_frequency.items()
                     },
-                    'most_frequent': max(object_frequency.items(), key=lambda x: x[1])[0] if object_frequency else None
+                    'most_frequent': max(object_frequency.items(), key=lambda x: x[1])[0] if object_frequency else None,
+                    'tracking_enabled': False,
+                    'data_accuracy': 'Legacy - May contain inflated counts'
                 }
                 
+                app.logger.warning(f"Using legacy frequency data for task {task_id}")
                 return jsonify(enhanced_data)
                 
         # If we get here, no successful task was found

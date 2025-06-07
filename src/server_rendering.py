@@ -21,8 +21,12 @@ class VideoRenderEngine:
         try:
             # Import here to avoid circular imports
             from src.object_detection import get_model
+            from src.object_tracker import ObjectTracker
+            
             self.model = get_model(model_name)
-            logger.info(f"Successfully initialized model: {model_name}")
+            # Initialize enhanced object tracker with improved settings
+            self.tracker = ObjectTracker(max_disappeared=15, iou_threshold=0.2)
+            logger.info(f"Successfully initialized model: {model_name} with enhanced tracking")
         except (ImportError, FileNotFoundError) as e:
             logger.error(f"Failed to initialize model: {e}")
             # Create a more informative error
@@ -130,12 +134,14 @@ class VideoRenderEngine:
             self._update_progress("Error: Failed to create video writer", 0)
             return None
         
-        # Process frames
+        # Process frames with enhanced tracking
         frame_count = 0
         processed_frames = 0
         detections_data = []
-        object_frequency = {}  # Track object frequency
-        unique_objects = set()  # Track unique objects by class+id
+        
+        # Reset tracker for this video
+        self.tracker.reset()
+        
         last_update_time = time.time()
         update_interval = 1  # Update progress every 1 second
         
@@ -159,21 +165,19 @@ class VideoRenderEngine:
                         # Print current frame for debugging
                         logger.info(f"Processing frame {frame_count}/{total_frames} ({int(progress)}%)")
                     
-                    # Detect objects with robust error handling
+                    # Detect objects with enhanced tracking
                     try:
-                        # Run detection using the appropriate model
-                        results = self.model(frame)
+                        # Run detection and tracking using enhanced system
+                        from src.object_detection import detect_objects_with_tracking
+                        frame_detections = detect_objects_with_tracking(frame, self.model, self.tracker)
                         
-                        # Extract detections (handle different YOLO versions)
-                        frame_detections = self._extract_detections_safely(results)
-                        
-                        # Draw detections on frame
+                        # Draw detections on frame with tracking IDs
                         annotated_frame = self._draw_detections(frame, frame_detections)
                         
                         # Write annotated frame to video
                         out.write(annotated_frame)
                         
-                        # Save detection data
+                        # Save detection data with consistent tracking IDs
                         timestamp = frame_count / fps
                         detections_data.append({
                             'frame_number': frame_count,
@@ -181,22 +185,13 @@ class VideoRenderEngine:
                             'detections': frame_detections
                         })
                         
-                        # Analyze object frequency - count by class and track ID
-                        for det in frame_detections:
-                            class_name = det['class_name']
-                            track_id = det.get('track_id')
-                            
-                            # Create a unique identifier for this object
-                            object_key = f"{class_name}_{track_id}" if track_id else class_name
-                            
-                            # Add to unique objects set
-                            unique_objects.add(object_key)
-                            
-                            # Count by class name
-                            if class_name in object_frequency:
-                                object_frequency[class_name] += 1
-                            else:
-                                object_frequency[class_name] = 1
+                        # Log tracking information for debugging
+                        if frame_detections:
+                            track_info = [(det['class_name'], det.get('track_id'), f"{det['confidence']:.2f}") for det in frame_detections]
+                            if frame_count % 30 == 0:  # Log every 30 frames to avoid spam
+                                logger.info(f"Frame {frame_count}: {track_info}")
+                                debug_info = self.tracker.get_debug_info()
+                                logger.info(f"Tracker stats: {debug_info['class_frequencies']}")
                         
                         processed_frames += 1
                         
@@ -290,7 +285,11 @@ class VideoRenderEngine:
         # Final success status update
         self._update_progress("Processing complete", 100)
         
-        # Return metadata about the processed video
+        # Get accurate frequency statistics from tracker
+        tracking_summary = self.tracker.get_tracking_summary()
+        object_frequency = tracking_summary['unique_object_frequencies']
+        
+        # Return metadata about the processed video with accurate tracking data
         result = {
             'hls_url': f'/hls_stream/{os.path.basename(output_dir)}/stream.m3u8',
             'master_url': f'/hls_stream/{os.path.basename(output_dir)}/master.m3u8',
@@ -301,8 +300,10 @@ class VideoRenderEngine:
             'total_frames': total_frames,
             'processed_frames': processed_frames,
             'segment_count': segment_count,
-            'object_frequency': object_frequency,  # Add this to the result
-            'unique_object_count': len(unique_objects),  # Add this to the result
+            'object_frequency': object_frequency,  # Accurate unique object counts
+            'unique_object_count': tracking_summary['total_unique_objects'],
+            'active_tracks': tracking_summary['active_tracks'],
+            'tracking_summary': tracking_summary,  # Complete tracking information
             'use_heatmap': use_heatmap,  # Make sure this is a boolean
             'rendered_video_path': temp_output_mp4  # Add this line to include the processed video path
         }
@@ -517,10 +518,13 @@ class VideoRenderEngine:
                 # Draw bounding box
                 cv2.rectangle(overlay, (x1, y1), (x2, y2), color, box_thickness)
                 
-                # Prepare label with class name and confidence
+                # Prepare label with class name, confidence, and track ID
                 label = f"{class_name}: {det['confidence']:.2f}"
                 if 'track_id' in det and det['track_id'] is not None:
                     label += f" ID:{det['track_id']}"
+                else:
+                    # Indicate when tracking ID is missing for debugging
+                    label += " (No ID)"
                     
                 # Draw label background
                 label_size, _ = cv2.getTextSize(label, font, text_size, 1)

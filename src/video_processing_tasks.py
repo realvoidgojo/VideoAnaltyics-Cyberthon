@@ -214,6 +214,13 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
         total_frames = len(frames)
         all_results = []
         
+        # Initialize enhanced object tracker for consistent tracking
+        from .object_tracker import ObjectTracker
+        from .object_detection import get_model
+        
+        tracker = ObjectTracker(max_disappeared=15, iou_threshold=0.2)
+        model = get_model(model_name)
+        
         for i, frame in enumerate(frames):
             # Check for task cancellation
             task_result = celery_app.AsyncResult(self.request.id)
@@ -237,8 +244,10 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
             
             logger.warning(f"Processing frame {i}")
             preprocessed_frame = video_processing.preprocess_frame(frame)
-            object_results = object_detection.detect_objects(preprocessed_frame, 
-                                                          model_path=f"./models/{model_name}")
+            
+            # Use enhanced detection with tracking
+            from .object_detection import detect_objects_with_tracking
+            object_results = detect_objects_with_tracking(preprocessed_frame, model, tracker)
             
             all_results.append([{
                 'class_name': det['class_name'],
@@ -266,9 +275,13 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
                     heatmap_video_path = task_result.info['heatmap_video_path']
                     logger.info(f"Using heatmap_video_path from task state: {heatmap_video_path}")
         
+        # Get accurate frequency statistics from tracker
+        tracking_summary = tracker.get_tracking_summary()
+        
         # Add information about whether heatmap was requested, regardless of success
         use_heatmap_value = use_heatmap.lower() == 'true'
         logger.info(f"Returning result with use_heatmap={use_heatmap_value}, heatmap_frames_count={len(heatmap_frames)}")
+        logger.info(f"Tracking summary: {tracking_summary}")
         
         return {
             'results': all_results,
@@ -279,7 +292,9 @@ def process_video_task(self, video_path, model_name, frame_interval, use_heatmap
             'heatmap_frames': heatmap_frames,
             'use_heatmap': use_heatmap_value,
             'heatmap_analysis': heatmap_analysis_data,
-            'heatmap_video_path': heatmap_video_path
+            'heatmap_video_path': heatmap_video_path,
+            'object_frequency': tracking_summary['unique_object_frequencies'],
+            'tracking_summary': tracking_summary
         }
 
     except heatmap_analysis.TaskCancelledError:
