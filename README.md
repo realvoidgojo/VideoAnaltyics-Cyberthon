@@ -154,44 +154,6 @@ npm run dev
 - Duration analysis
 - Downloadable heatmap videos
 
-## 🔧 Troubleshooting
-
-### Common Issues
-
-- **Browser Crashes or SIGILL Errors**:
-
-  - Use a smaller frame interval (process fewer frames)
-  - Select a smaller model (e.g., yolov11n instead of yolov11l)
-  - Close other browser tabs to free memory
-
-- **Video Not Playing**:
-
-  - Check if browser supports HLS streaming
-  - Try the "External Player" option
-  - Use the direct download link instead
-
-- **Slow Processing**:
-
-  - Enable GPU acceleration if available
-  - Increase frame interval to process fewer frames
-  - Select a smaller YOLO model variant
-
-- **CORS Errors**:
-
-  - Ensure backend and frontend are running on allowed origins
-
-- **Redis Connection Issues**:
-  - Verify Redis server is running
-  - Check Redis port configuration
-
-### Performance Optimization
-
-This application includes several optimizations:
-
-- **Memory Management**: Automatic cleanup of unused resources
-- **Request Throttling**: Intelligent polling with cooldown periods
-- **Caching**: Detection results are cached to prevent redundant fetches
-- **Exponential Backoff**: Polling frequency reduces for completed tasks
 
 ## 📁 Project Structure
 
