@@ -34,9 +34,9 @@ Before getting started, ensure you have installed:
 
 For significantly faster processing:
 
-- **CUDA Toolkit:** Version 11.6 or higher
+- **CUDA Toolkit:** Version 11.8
   - [Download CUDA Toolkit](https://developer.nvidia.com/cuda-downloads)
-- **cuDNN:** Matching your CUDA version
+- **cuDNN:** Matching your CUDA (11.8) version 9.10.2 
   - [cuDNN Download Page](https://developer.nvidia.com/cudnn-downloads)
 - **PyTorch with CUDA:** Installed via custom index
   - [PyTorch Installation Guide](https://pytorch.org/get-started/locally/)
@@ -59,7 +59,7 @@ cd VideoAnaltyics-Cyberthon
 ### 2. Set Up Conda Environment (Recommended)
 
 ```bash
-conda create -n video_env python=3.12 -y
+conda create -n video_env python=3.10 -y
 conda activate video_env
 conda install -c conda-forge opencv ffmpeg -y
 conda install -c conda-forge ffmpeg=6.1.1=gpl* -y
@@ -73,7 +73,7 @@ pip install -r requirements.txt
 
 # For CUDA support (optional, replace cu116 with your CUDA version):
 pip uninstall torch torchvision -y
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu116
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
 
 # Create necessary directories
 mkdir -p data hls_stream

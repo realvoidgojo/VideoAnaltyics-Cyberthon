@@ -19,7 +19,7 @@ const Checkbox = ({
   
   return (
     <div className={`flex items-start ${containerClassName}`}>
-      <div className="flex items-center h-5">
+      <div className="flex items-center h-6">
         <input
           id={checkboxId}
           name={name}
@@ -28,21 +28,22 @@ const Checkbox = ({
           onChange={onChange}
           disabled={disabled}
           className={`
-            h-5 w-5 rounded
-            text-blue-600 border-gray-300 focus:ring-blue-500
-            transition-colors duration-200
-            ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
+            h-5 w-5 rounded border-2
+            text-blue-600 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+            transition-all duration-200
+            ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-blue-400'}
+            ${checked ? 'bg-blue-600 border-blue-600' : 'bg-white'}
             ${className}
           `}
           {...props}
         />
       </div>
-      <div className="ml-3 text-sm">
+      <div className="ml-3 flex-1">
         {label && (
           <label 
             htmlFor={checkboxId} 
             className={`
-              font-medium text-gray-700
+              block font-medium text-gray-700 leading-6
               ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
               ${labelClassName}
             `}
@@ -51,7 +52,7 @@ const Checkbox = ({
           </label>
         )}
         {helperText && (
-          <p className="text-gray-500 mt-1">{helperText}</p>
+          <p className="text-gray-500 mt-1 text-sm leading-5">{helperText}</p>
         )}
       </div>
     </div>

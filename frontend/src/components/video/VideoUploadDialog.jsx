@@ -13,12 +13,10 @@ const VideoUploadDialog = ({
   selectedFile,
   selectedModel,
   frameInterval,
-  containerWidth,
   useHeatmap,
   onVideoUpload,
   onModelChange,
   setFrameInterval,
-  setContainerWidth,
   setUseHeatmap,
   fileInputRef,
   isLoading,
@@ -30,22 +28,18 @@ const VideoUploadDialog = ({
     setSelectedModel: contextSetModel,
   } = useJobContext();
 
-  // *** FIX: Use local state for form values to avoid closing dialog on change ***
+  // Use local state for form values to avoid closing dialog on change
   const [localFrameInterval, setLocalFrameInterval] = useState(frameInterval);
-  const [localContainerWidth, setLocalContainerWidth] =
-    useState(containerWidth);
   const [localUseHeatmap, setLocalUseHeatmap] = useState(useHeatmap);
   const [localSelectedModel, setLocalSelectedModel] = useState(selectedModel);
 
   // Sync local state with props if they change externally
   useEffect(() => {
     setLocalFrameInterval(frameInterval);
-    setLocalContainerWidth(containerWidth);
     setLocalUseHeatmap(useHeatmap);
     setLocalSelectedModel(selectedModel);
-  }, [frameInterval, containerWidth, useHeatmap, selectedModel]);
+  }, [frameInterval, useHeatmap, selectedModel]);
 
-  // *** END FIX ***
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fileSelected, setFileSelected] = useState(false);
   const [validationError, setValidationError] = useState(null);
@@ -73,7 +67,7 @@ const VideoUploadDialog = ({
     return true;
   };
 
-  // Enhance handleVideoUpload method
+  // Enhanced handleVideoUpload method
   const handleVideoUpload = (e) => {
     const files = e.target.files;
     if (files && files.length > 0) {
@@ -95,14 +89,15 @@ const VideoUploadDialog = ({
     }
   };
 
-  // Enhanced save method with better model state handling
+  // Enhanced save method with proper validation
   const handleSave = async () => {
     if (!selectedFile) {
       setValidationError("Please select a video file");
       return;
     }
 
-    if (localFrameInterval < 1 || localFrameInterval > 30) {
+    // Validate frame interval
+    if (!localFrameInterval || localFrameInterval < 1 || localFrameInterval > 30) {
       setValidationError("Frame interval must be between 1 and 30");
       return;
     }
@@ -113,7 +108,6 @@ const VideoUploadDialog = ({
     try {
       // Update global state before submitting
       setFrameInterval(localFrameInterval);
-      setContainerWidth(localContainerWidth);
       setUseHeatmap(localUseHeatmap);
 
       // Handle model change specifically to ensure it's properly updated
@@ -127,12 +121,12 @@ const VideoUploadDialog = ({
         }
       }
 
-      // Always use server-side rendering
+      // Save the job without containerWidth (using default value from backend)
       await onSave(
         selectedFile,
-        localSelectedModel, // Use local state for submission
+        localSelectedModel,
         localFrameInterval,
-        localContainerWidth,
+        720, // Use default container width for HLS player
         localUseHeatmap,
         true // force server-side rendering
       );
@@ -162,6 +156,20 @@ const VideoUploadDialog = ({
     setLocalSelectedModel(newModelValue);
   };
 
+  // Handle frame interval change with proper validation
+  const handleFrameIntervalChange = (e) => {
+    const value = e.target.value;
+    // Allow empty string during typing, but use 1 as minimum
+    if (value === "") {
+      setLocalFrameInterval("");
+    } else {
+      const parsed = parseInt(value, 10);
+      if (!isNaN(parsed)) {
+        setLocalFrameInterval(Math.max(1, Math.min(30, parsed)));
+      }
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 bg-gray-800 bg-opacity-80 flex items-center justify-center z-50 p-4 backdrop-blur-sm overflow-y-auto"
@@ -171,14 +179,14 @@ const VideoUploadDialog = ({
       }}
     >
       <div
-        className="bg-white p-5 rounded-xl shadow-2xl w-full max-w-lg relative animate-fadeIn"
+        className="bg-white rounded-xl shadow-2xl w-full max-w-2xl relative animate-fadeIn my-8"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center px-6 py-5 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-800">Create New Job</h2>
           <button
-            className="text-gray-500 hover:text-gray-700 rounded-full p-1 hover:bg-gray-100 transition-colors"
+            className="text-gray-500 hover:text-gray-700 rounded-full p-2 hover:bg-gray-100 transition-colors"
             onClick={onClose}
             aria-label="Close dialog"
           >
@@ -186,133 +194,118 @@ const VideoUploadDialog = ({
           </button>
         </div>
 
-        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-          {/* Video Upload Section */}
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-            <div className="flex items-center mb-2">
-              <Upload className="h-4 w-4 text-blue-500 mr-2" />
-              <h3 className="text-md font-medium text-gray-700">
-                Upload Video
-              </h3>
-            </div>
-            <VideoUpload
-              onVideoUpload={handleVideoUpload}
-              fileInputRef={fileInputRef}
-            />
-          </div>
-
-          {/* Model Selection */}
-          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-center mb-2">
-              <svg
-                className="h-4 w-4 text-blue-500 mr-2"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
-                <polyline points="7.5 19.79 7.5 14.6 3 12"></polyline>
-                <polyline points="21 12 16.5 14.6 16.5 19.79"></polyline>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                <line x1="12" y1="22.08" x2="12" y2="12"></line>
-              </svg>
-              <h3 className="text-md font-medium text-gray-700">
-                Model Selection
-              </h3>
-            </div>
-            <ModelSelection
-              value={localSelectedModel}
-              onChange={handleLocalModelChange}
-              options={[
-                {
-                  value: "yolov11n.pt",
-                  label: "YOLOv11n (Nano) - Fastest, Lower Accuracy",
-                },
-                {
-                  value: "yolov11s.pt",
-                  label: "YOLOv11s (Small) - Fast, Good Accuracy",
-                },
-                { value: "yolov11m.pt", label: "YOLOv11m (Medium) - Balanced" },
-                {
-                  value: "yolov11l.pt",
-                  label: "YOLOv11l (Large) - High Accuracy",
-                },
-                {
-                  value: "yolov11x.pt",
-                  label: "YOLOv11x (Extra Large) - Best Accuracy",
-                },
-              ]}
-            />
-          </div>
-
-          {/* Processing Parameters - side by side */}
-          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-center mb-3">
-              <Sliders className="h-4 w-4 text-gray-500 mr-2" />
-              <h3 className="text-md font-medium text-gray-700">Parameters</h3>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              {/* *** FIX: Use local state handlers *** */}
-              <Input
-                label="Frame Interval"
-                type="number"
-                value={localFrameInterval}
-                onChange={(e) =>
-                  setLocalFrameInterval(parseInt(e.target.value, 10) || 1)
-                }
-                min="1"
-                max="30"
-                helperText="Every nth frame"
+        <div className="px-6 py-6 max-h-[70vh] overflow-y-auto">
+          <div className="space-y-6">
+            {/* Video Upload Section */}
+            <div className="p-5 bg-blue-50 rounded-lg border border-blue-100">
+              <div className="flex items-center mb-3">
+                <Upload className="h-5 w-5 text-blue-500 mr-2" />
+                <h3 className="text-lg font-medium text-gray-700">
+                  Upload Video
+                </h3>
+              </div>
+              <VideoUpload
+                onVideoUpload={handleVideoUpload}
+                fileInputRef={fileInputRef}
               />
+            </div>
 
-              <Input
-                label="Width"
-                type="number"
-                value={localContainerWidth}
-                onChange={(e) =>
-                  setLocalContainerWidth(parseInt(e.target.value, 10) || 100)
-                }
-                min="100"
-                max="1920"
-                helperText="Display width"
+            {/* Model Selection */}
+            <div className="p-5 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center mb-3">
+                <svg
+                  className="h-5 w-5 text-blue-500 mr-2"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                  <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+                  <polyline points="7.5 19.79 7.5 14.6 3 12"></polyline>
+                  <polyline points="21 12 16.5 14.6 16.5 19.79"></polyline>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                <h3 className="text-lg font-medium text-gray-700">
+                  Model Selection
+                </h3>
+              </div>
+              <ModelSelection
+                value={localSelectedModel}
+                onChange={handleLocalModelChange}
+                options={[
+                  {
+                    value: "yolov11n.pt",
+                    label: "YOLOv11n (Nano) - Fastest, Lower Accuracy",
+                  },
+                  {
+                    value: "yolov11s.pt",
+                    label: "YOLOv11s (Small) - Fast, Good Accuracy",
+                  },
+                  { value: "yolov11m.pt", label: "YOLOv11m (Medium) - Balanced" },
+                  {
+                    value: "yolov11l.pt",
+                    label: "YOLOv11l (Large) - High Accuracy",
+                  },
+                  {
+                    value: "yolov11x.pt",
+                    label: "YOLOv11x (Extra Large) - Best Accuracy",
+                  },
+                ]}
               />
-              {/* *** END FIX *** */}
             </div>
-          </div>
 
-          {/* Heatmap Section - compact */}
-          <div className="p-4 bg-green-50 rounded-lg border border-green-100">
-            <div className="flex items-center mb-2">
-              <Thermometer className="h-4 w-4 text-green-500 mr-2" />
-              <h3 className="text-md font-medium text-gray-700">
-                Heatmap Analysis
-              </h3>
+            {/* Processing Parameters */}
+            <div className="p-5 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center mb-4">
+                <Sliders className="h-5 w-5 text-gray-500 mr-2" />
+                <h3 className="text-lg font-medium text-gray-700">Processing Parameters</h3>
+              </div>
+
+              <div className="max-w-sm">
+                <Input
+                  label="Frame Interval"
+                  type="number"
+                  value={localFrameInterval}
+                  onChange={handleFrameIntervalChange}
+                  min="1"
+                  max="30"
+                  placeholder="5"
+                  helperText="Process every nth frame (1-30)"
+                />
+              </div>
             </div>
-            {/* *** FIX: Use local state for heatmap *** */}
-            <HeatmapCheckbox
-              useHeatmap={localUseHeatmap}
-              setUseHeatmap={setLocalUseHeatmap}
-            />
-            {/* *** END FIX *** */}
+
+            {/* Heatmap Section */}
+            <div className="p-5 bg-green-50 rounded-lg border border-green-100">
+              <div className="flex items-center mb-3">
+                <Thermometer className="h-5 w-5 text-green-500 mr-2" />
+                <h3 className="text-lg font-medium text-gray-700">
+                  Heatmap Analysis
+                </h3>
+              </div>
+              <HeatmapCheckbox
+                useHeatmap={localUseHeatmap}
+                setUseHeatmap={setLocalUseHeatmap}
+              />
+            </div>
           </div>
         </div>
 
         {/* Validation Error */}
         {validationError && (
-          <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center animate-fadeIn text-sm">
+          <div className="mx-6 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center animate-fadeIn text-sm">
             <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
             <span>{validationError}</span>
           </div>
         )}
 
         {/* Footer */}
-        <div className="flex justify-between mt-4 pt-3 border-t border-gray-200">
+        <div className="flex justify-between items-center px-6 py-5 border-t border-gray-200 bg-gray-50 rounded-b-xl">
           <Button
             variant="secondary"
             onClick={onClose}

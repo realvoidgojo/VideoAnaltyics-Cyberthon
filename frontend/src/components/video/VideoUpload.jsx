@@ -1,6 +1,6 @@
 // VideoUpload.jsx
 import React, { useState, useCallback } from "react";
-import { Upload, FileVideo } from "lucide-react";
+import { Upload, FileVideo, Check } from "lucide-react";
 import PropTypes from "prop-types";
 
 const VideoUpload = ({ onVideoUpload, fileInputRef }) => {
@@ -60,7 +60,13 @@ const VideoUpload = ({ onVideoUpload, fileInputRef }) => {
 
   return (
     <div
-      className={`relative border-2 border-dashed rounded-lg p-6 transition-colors ${isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400"}`}
+      className={`relative border-2 border-dashed rounded-lg p-8 transition-all duration-200 ${
+        isDragging 
+          ? "border-blue-500 bg-blue-50 scale-[1.02]" 
+          : fileName 
+          ? "border-green-400 bg-green-50 hover:border-green-500" 
+          : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
+      }`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -76,32 +82,57 @@ const VideoUpload = ({ onVideoUpload, fileInputRef }) => {
       />
 
       <div className="flex flex-col items-center justify-center text-center">
-        <div className={`mb-3 p-3 rounded-full ${isDragging ? "bg-blue-100" : "bg-gray-100"}`}>
+        <div className={`mb-4 p-4 rounded-full transition-colors ${
+          isDragging 
+            ? "bg-blue-100" 
+            : fileName 
+            ? "bg-green-100" 
+            : "bg-gray-100"
+        }`}>
           {fileName ? (
-            <FileVideo className="h-8 w-8 text-blue-500" />
+            <FileVideo className="h-10 w-10 text-green-600" />
+          ) : isDragging ? (
+            <Upload className="h-10 w-10 text-blue-500 animate-bounce" />
           ) : (
-            <Upload className="h-8 w-8 text-gray-400" />
+            <Upload className="h-10 w-10 text-gray-400" />
           )}
         </div>
 
         {fileName ? (
-          <div>
-            <p className="text-sm font-medium text-gray-900 mb-1 truncate max-w-xs">{fileName}</p>
-            <p className="text-xs text-gray-500">Click or drag to replace</p>
+          <div className="mb-4">
+            <div className="flex items-center justify-center mb-2">
+              <Check className="h-4 w-4 text-green-600 mr-2" />
+              <p className="text-sm font-semibold text-green-700">File Selected</p>
+            </div>
+            <p className="text-sm font-medium text-gray-900 mb-1 truncate max-w-xs">
+              {fileName}
+            </p>
+            <p className="text-xs text-gray-500">
+              Click below to replace with a different file
+            </p>
           </div>
         ) : (
-          <div>
-            <p className="text-sm font-medium text-gray-700 mb-1">
-              Drag and drop your video here
+          <div className="mb-4">
+            <p className="text-lg font-medium text-gray-700 mb-2">
+              {isDragging ? "Drop your video here" : "Drag and drop your video here"}
             </p>
-            <p className="text-xs text-gray-500 mb-3">MP4, MOV, AVI, or WebM files</p>
+            <p className="text-sm text-gray-500 mb-1">
+              Supports MP4, MOV, AVI, and WebM files
+            </p>
+            <p className="text-xs text-gray-400">
+              Maximum file size: 500MB
+            </p>
           </div>
         )}
 
         <button
           type="button"
           onClick={handleButtonClick}
-          className="mt-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
+          className={`px-6 py-3 rounded-lg transition-all duration-200 font-medium ${
+            fileName 
+              ? "bg-green-600 text-white hover:bg-green-700 shadow-sm hover:shadow-md" 
+              : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow-md"
+          }`}
         >
           {fileName ? "Replace Video" : "Select Video"}
         </button>

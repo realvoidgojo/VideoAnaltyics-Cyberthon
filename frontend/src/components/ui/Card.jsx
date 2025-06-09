@@ -32,23 +32,23 @@ const Card = ({
     >
       {/* Card Header */}
       {(title || icon) && (
-        <div className={`px-6 py-4 border-b ${headerClassName}`}>
+        <div className={`px-6 py-5 border-b ${headerClassName}`}>
           <div className="flex items-center">
-            {icon && <div className="mr-3">{icon}</div>}
-            <div>
-              {title && <h3 className="text-lg font-semibold">{title}</h3>}
-              {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
+            {icon && <div className="mr-3 flex-shrink-0">{icon}</div>}
+            <div className="min-w-0 flex-1">
+              {title && <h3 className="text-lg font-semibold text-gray-900 truncate">{title}</h3>}
+              {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
             </div>
           </div>
         </div>
       )}
 
       {/* Card Body */}
-      <div className={`p-6 ${bodyClassName}`}>{children}</div>
+      <div className={`px-6 py-6 ${bodyClassName}`}>{children}</div>
 
       {/* Card Footer */}
       {footer && (
-        <div className={`px-6 py-4 border-t ${footerClassName}`}>{footer}</div>
+        <div className={`px-6 py-5 border-t bg-gray-50 ${footerClassName}`}>{footer}</div>
       )}
     </div>
   );

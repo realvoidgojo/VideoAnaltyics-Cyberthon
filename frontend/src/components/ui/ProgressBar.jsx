@@ -19,14 +19,21 @@ const ProgressBar = ({
     processingStage?.toLowerCase() === "processing complete";
 
   // Format stage label based on current processing stage
+  // Object Detection should always be Phase 1, Heatmap should be Phase 2
   const getStageLabel = () => {
     if (!processingStage) return "Processing...";
 
     if (useHeatmap) {
-      if (processingStage?.toLowerCase().includes("heatmap")) {
-        return "Phase 1: Heatmap Analysis";
-      } else if (processingStage?.toLowerCase().includes("processing frame")) {
-        return "Phase 2: Object Detection";
+      // Object detection processing (Phase 1)
+      if (processingStage?.toLowerCase().includes("processing frame") || 
+          processingStage?.toLowerCase().includes("object detection") ||
+          processingStage?.toLowerCase().includes("detecting")) {
+        return "Phase 1: Object Detection";
+      }
+      // Heatmap processing (Phase 2)
+      else if (processingStage?.toLowerCase().includes("heatmap") ||
+               processingStage?.toLowerCase().includes("heat map")) {
+        return "Phase 2: Heatmap Analysis";
       }
     }
 
@@ -34,16 +41,36 @@ const ProgressBar = ({
   };
 
   // Get phase number for visual indicator
+  // Object Detection = Phase 1, Heatmap = Phase 2
   const getCurrentPhase = () => {
     if (!useHeatmap) return null;
 
-    if (processingStage?.toLowerCase().includes("heatmap")) return 1;
-    if (processingStage?.toLowerCase().includes("processing frame")) return 2;
+    // Object detection processing (Phase 1)
+    if (processingStage?.toLowerCase().includes("processing frame") || 
+        processingStage?.toLowerCase().includes("object detection") ||
+        processingStage?.toLowerCase().includes("detecting")) {
+      return 1;
+    }
+    // Heatmap processing (Phase 2)
+    if (processingStage?.toLowerCase().includes("heatmap") ||
+        processingStage?.toLowerCase().includes("heat map")) {
+      return 2;
+    }
 
     return null;
   };
 
   const currentPhase = getCurrentPhase();
+
+  // Determine phase completion status
+  const getPhaseStatus = (phase) => {
+    if (!useHeatmap) return "inactive";
+    
+    if (isCompleted) return "completed";
+    if (currentPhase === phase) return "active";
+    if (currentPhase > phase) return "completed";
+    return "inactive";
+  };
 
   // Format estimated time left
   const formatTime = (seconds) => {
@@ -81,47 +108,50 @@ const ProgressBar = ({
 
       {/* Phase indicator for heatmap processes */}
       {useHeatmap && (
-        <div className="flex mt-2 space-x-2">
-          <div className="flex-1 bg-gray-100 rounded-md p-1 flex items-center">
+        <div className="flex mt-3 space-x-2">
+          {/* Phase 1: Object Detection */}
+          <div className="flex-1 bg-gray-100 rounded-md p-2 flex items-center">
             <div
-              className={`h-1.5 w-1.5 rounded-full mr-2 ${
-                currentPhase === 1
+              className={`h-2 w-2 rounded-full mr-2 ${
+                getPhaseStatus(1) === "active"
                   ? "bg-blue-500 animate-pulse"
-                  : currentPhase > 1 || isCompleted
+                  : getPhaseStatus(1) === "completed"
                   ? "bg-green-500"
                   : "bg-gray-300"
               }`}
             ></div>
-            <span className="text-xs text-gray-600">
-              Phase 1: Heatmap Analysis
+            <span className="text-xs text-gray-700 font-medium">
+              Phase 1: Object Detection
             </span>
           </div>
-          <div className="flex-1 bg-gray-100 rounded-md p-1 flex items-center">
+          
+          {/* Phase 2: Heatmap Analysis */}
+          <div className="flex-1 bg-gray-100 rounded-md p-2 flex items-center">
             <div
-              className={`h-1.5 w-1.5 rounded-full mr-2 ${
-                currentPhase === 2
+              className={`h-2 w-2 rounded-full mr-2 ${
+                getPhaseStatus(2) === "active"
                   ? "bg-blue-500 animate-pulse"
-                  : isCompleted
+                  : getPhaseStatus(2) === "completed"
                   ? "bg-green-500"
                   : "bg-gray-300"
               }`}
             ></div>
-            <span className="text-xs text-gray-600">
-              Phase 2: Object Detection
+            <span className="text-xs text-gray-700 font-medium">
+              Phase 2: Heatmap Analysis
             </span>
           </div>
         </div>
       )}
 
       {/* Information area with improved time remaining display */}
-      <div className="flex justify-between mt-2 text-sm text-gray-600">
+      <div className="flex justify-between mt-3 text-sm text-gray-600">
         <div className="flex items-center">
           {isCompleted ? (
             <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
           ) : (
             <Loader2 className="h-4 w-4 text-blue-500 mr-2 animate-spin" />
           )}
-          <span>{getStageLabel()}</span>
+          <span className="font-medium">{getStageLabel()}</span>
         </div>
 
         {timeLeftFormatted && !isCompleted && (

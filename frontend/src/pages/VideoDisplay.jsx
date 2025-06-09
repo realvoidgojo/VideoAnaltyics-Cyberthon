@@ -19,40 +19,42 @@ const DashboardOverview = ({ jobs }) => {
   if (jobs.length === 0) return null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-4 animate-fadeIn">
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 animate-fadeIn">
       <Card className="bg-white shadow-md overflow-hidden">
-        <div className="p-5 border-b border-gray-200">
+        <div className="px-6 py-5 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-800 flex items-center">
             <BarChart3 className="h-5 w-5 mr-2 text-blue-500" />
             Analytics Overview
           </h2>
         </div>
-        <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-            <h3 className="text-sm font-medium text-gray-600 mb-1">
-              Total Jobs
-            </h3>
-            <p className="text-2xl font-bold text-blue-600">{jobs.length}</p>
-          </div>
-          <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-            <h3 className="text-sm font-medium text-gray-600 mb-1">
-              Heatmap Enabled
-            </h3>
-            <p className="text-2xl font-bold text-green-600">
-              {jobs.filter((job) => job.useHeatmap).length}
-            </p>
-          </div>
-          <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
-            <h3 className="text-sm font-medium text-gray-600 mb-1">
-              Latest Job
-            </h3>
-            <p className="text-lg font-medium text-purple-600 truncate">
-              {jobs[jobs.length - 1]?.selectedFile?.name || "N/A"}
-            </p>
+        <div className="px-6 py-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="bg-blue-50 p-5 rounded-lg border border-blue-100">
+              <h3 className="text-sm font-medium text-gray-600 mb-2">
+                Total Jobs
+              </h3>
+              <p className="text-2xl font-bold text-blue-600">{jobs.length}</p>
+            </div>
+            <div className="bg-green-50 p-5 rounded-lg border border-green-100">
+              <h3 className="text-sm font-medium text-gray-600 mb-2">
+                Heatmap Enabled
+              </h3>
+              <p className="text-2xl font-bold text-green-600">
+                {jobs.filter((job) => job.useHeatmap).length}
+              </p>
+            </div>
+            <div className="bg-purple-50 p-5 rounded-lg border border-purple-100 sm:col-span-2 lg:col-span-1">
+              <h3 className="text-sm font-medium text-gray-600 mb-2">
+                Latest Job
+              </h3>
+              <p className="text-lg font-medium text-purple-600 truncate">
+                {jobs[jobs.length - 1]?.selectedFile?.name || "N/A"}
+              </p>
+            </div>
           </div>
         </div>
       </Card>
-    </div>
+    </section>
   );
 };
 
@@ -67,16 +69,14 @@ const VideoDisplayContent = () => {
     selectedFile,
     selectedModel,
     frameInterval,
-    containerWidth,
     useHeatmap,
     handleVideoUpload,
     saveJobPreset,
     handleResetAll,
     isLoading,
-    setFrameInterval, // Add this setter
-    setContainerWidth, // Add this setter
-    setUseHeatmap, // Add this setter
-    setSelectedModel, // Add this setter if needed
+    setFrameInterval,
+    setUseHeatmap,
+    setSelectedModel,
   } = useJobContext();
 
   const fileInputRef = useRef(null);
@@ -110,12 +110,12 @@ const VideoDisplayContent = () => {
 
       {/* Error Message - with animation */}
       {error && (
-        <div className="max-w-7xl mx-auto px-4 py-2 mt-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center animate-fadeIn">
-            <AlertCircle className="h-5 w-5 mr-2" />
-            <span>{error}</span>
+            <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+            <span className="flex-1">{error}</span>
             <button
-              className="ml-auto text-red-500 hover:text-red-700 transition-colors"
+              className="ml-3 text-red-500 hover:text-red-700 transition-colors flex-shrink-0"
               onClick={() => setError(null)}
               aria-label="Dismiss error"
             >
@@ -139,12 +139,10 @@ const VideoDisplayContent = () => {
           selectedFile={selectedFile}
           selectedModel={selectedModel}
           frameInterval={frameInterval}
-          containerWidth={containerWidth}
           useHeatmap={useHeatmap}
           onVideoUpload={handleVideoUpload}
           onModelChange={(e) => setSelectedModel(e.target.value)}
           setFrameInterval={setFrameInterval}
-          setContainerWidth={setContainerWidth}
           setUseHeatmap={setUseHeatmap}
           fileInputRef={fileInputRef}
           isLoading={isLoading}
@@ -157,7 +155,7 @@ const VideoDisplayContent = () => {
       {/* Loading Overlay - shows when isLoading is true */}
       {isLoading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl flex items-center">
+          <div className="bg-white p-8 rounded-lg shadow-xl flex items-center">
             <Loader2 className="h-6 w-6 text-blue-500 animate-spin mr-3" />
             <p className="text-gray-700 font-medium">Processing...</p>
           </div>
@@ -174,38 +172,40 @@ const Header = ({
   jobCount = 0,
   isLoading = false,
 }) => (
-  <div className="sticky top-0 z-10 bg-gray-800 p-4 shadow-lg">
-    <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center">
-      <div className="flex items-center mb-4 sm:mb-0">
-        <h1 className="text-2xl font-bold text-white flex items-center">
-          <Film className="h-6 w-6 mr-2 text-blue-400" />
-          CCTV Analytics Dashboard
-        </h1>
-        {jobCount > 0 && (
-          <Badge variant="primary" size="sm" className="ml-3">
-            {jobCount} {jobCount === 1 ? "Job" : "Jobs"}
-          </Badge>
-        )}
-      </div>
-      <div className="flex space-x-3">
-        <Button
-          variant="primary"
-          icon={<Plus className="h-5 w-5" />}
-          onClick={onShowDialog}
-          disabled={isLoading}
-          className="transition-all duration-300 hover:shadow-lg"
-        >
-          New Job
-        </Button>
-        <Button
-          variant="danger"
-          icon={<Trash2 className="h-5 w-5" />}
-          onClick={onResetAll}
-          disabled={jobCount === 0 || isLoading}
-          className="transition-all duration-300 hover:shadow-lg"
-        >
-          Reset All
-        </Button>
+  <div className="sticky top-0 z-10 bg-gray-800 shadow-lg">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="flex items-center">
+          <h1 className="text-2xl font-bold text-white flex items-center">
+            <Film className="h-6 w-6 mr-2 text-blue-400" />
+            CCTV Analytics Dashboard
+          </h1>
+          {jobCount > 0 && (
+            <Badge variant="primary" size="sm" className="ml-3">
+              {jobCount} {jobCount === 1 ? "Job" : "Jobs"}
+            </Badge>
+          )}
+        </div>
+        <div className="flex space-x-3">
+          <Button
+            variant="primary"
+            icon={<Plus className="h-5 w-5" />}
+            onClick={onShowDialog}
+            disabled={isLoading}
+            className="transition-all duration-300 hover:shadow-lg"
+          >
+            New Job
+          </Button>
+          <Button
+            variant="danger"
+            icon={<Trash2 className="h-5 w-5" />}
+            onClick={onResetAll}
+            disabled={jobCount === 0 || isLoading}
+            className="transition-all duration-300 hover:shadow-lg"
+          >
+            Reset All
+          </Button>
+        </div>
       </div>
     </div>
   </div>
@@ -213,13 +213,11 @@ const Header = ({
 
 // Jobs Container component
 const JobsContainer = ({ jobs, onShowDialog }) => (
-  <div className="w-full max-w-7xl mx-auto px-4 py-8">
-    {" "}
-    {/* Increased from max-w-6xl to max-w-7xl */}
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {jobs.length === 0 ? (
       <EmptyJobsView onShowDialog={onShowDialog} />
     ) : (
-      <div className="grid grid-cols-1 gap-8 animate-fadeIn">
+      <div className="space-y-8 animate-fadeIn">
         {jobs.map((job) => (
           <JobCard key={job.id} job={job} />
         ))}
@@ -230,35 +228,37 @@ const JobsContainer = ({ jobs, onShowDialog }) => (
 
 // Empty state component
 const EmptyJobsView = ({ onShowDialog }) => (
-  <Card
-    className="justify-center flex flex-col items-center min-h-[60vh] p-10 text-center animate-fadeIn bg-white rounded-2xl shadow-md"
-    variant="default"
-  >
-    <div className="flex justify-center items-center w-full">
-      <div className="relative bg-blue-100 p-6 rounded-full mb-6 flex justify-center items-center">
-        <Film className="h-14 w-14 text-blue-500" />
+  <div className="flex justify-center items-center min-h-[60vh]">
+    <Card
+      className="max-w-md w-full text-center animate-fadeIn bg-white rounded-2xl shadow-md"
+      variant="default"
+    >
+      <div className="p-10">
+        <div className="flex justify-center mb-6">
+          <div className="bg-blue-100 p-6 rounded-full">
+            <Film className="h-14 w-14 text-blue-500" />
+          </div>
+        </div>
+
+        <h3 className="text-2xl font-semibold text-gray-800 mb-3">No Jobs Yet</h3>
+
+        <p className="text-gray-600 mb-8 text-sm leading-relaxed">
+          Get started by creating your first video analysis job. Upload a video and
+          configure the processing parameters to begin detecting objects.
+        </p>
+
+        <Button
+          variant="primary"
+          size="lg"
+          icon={<Plus className="h-5 w-5" />}
+          onClick={onShowDialog}
+          className="px-8 py-3 text-sm font-medium"
+        >
+          Create New Job
+        </Button>
       </div>
-    </div>
-
-    <h3 className="text-2xl font-semibold text-gray-800 mb-2">No Jobs Yet</h3>
-
-    <p className="text-gray-600 mb-6 max-w-sm text-sm leading-relaxed">
-      Get started by creating your first video analysis job. Upload a video and
-      configure the processing parameters to begin detecting objects.
-    </p>
-
-    <div className="flex justify-center items-center w-full">
-      <Button
-        variant="primary"
-        size="lg"
-        icon={<Plus className="h-5 w-5" />}
-        onClick={onShowDialog}
-        className="px-6 py-3 text-sm font-medium"
-      >
-        Create New Job
-      </Button>
-    </div>
-  </Card>
+    </Card>
+  </div>
 );
 
 // Export the VideoDisplayContent as the main component

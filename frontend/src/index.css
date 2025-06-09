@@ -34,3 +34,33 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-gray-400);
 }
+
+/* Additional spacing utilities for consistency */
+.section-spacing {
+  padding: 1.5rem 0;
+}
+
+.container-spacing {
+  padding: 0 1rem;
+}
+
+@media (min-width: 640px) {
+  .container-spacing {
+    padding: 0 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-spacing {
+    padding: 0 2rem;
+  }
+}
+
+/* Enhanced card shadows for depth */
+.card-shadow {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.card-shadow-hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}

@@ -25,7 +25,6 @@ export const JobProvider = ({ children }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedModel, setSelectedModel] = useState("yolov11n.pt");
   const [frameInterval, setFrameInterval] = useState(5); // Default value
-  const [containerWidth, setContainerWidth] = useState(720); // Default value
   const [useHeatmap, setUseHeatmap] = useState(false);
 
   // Clear error after 5 seconds
@@ -47,11 +46,14 @@ export const JobProvider = ({ children }) => {
     selectedFile,
     selectedModel,
     frameInterval,
-    containerWidth,
+    containerWidth, // Still accept it for compatibility but use default
     useHeatmap
   ) => {
     try {
       setIsLoading(true);
+
+      // Use default container width for consistency
+      const defaultContainerWidth = 720;
 
       // Create a new job
       const newJob = {
@@ -59,7 +61,7 @@ export const JobProvider = ({ children }) => {
         selectedFile,
         selectedModel,
         frameInterval,
-        containerWidth,
+        containerWidth: defaultContainerWidth, // Always use default
         useHeatmap,
         videoSource: selectedFile ? URL.createObjectURL(selectedFile) : null,
         showHeatmap: false,
@@ -96,7 +98,6 @@ export const JobProvider = ({ children }) => {
       setSelectedFile(null);
       setSelectedModel("yolov11n.pt");
       setFrameInterval(5);
-      setContainerWidth(720);
       setUseHeatmap(false);
     } catch (error) {
       console.error("Error processing video:", error);
@@ -149,11 +150,9 @@ export const JobProvider = ({ children }) => {
     selectedModel,
     setSelectedModel,
     frameInterval,
-    setFrameInterval, // Include this
-    containerWidth,
-    setContainerWidth, // Include this
+    setFrameInterval,
     useHeatmap,
-    setUseHeatmap, // Include this
+    setUseHeatmap,
     handleVideoUpload,
     saveJobPreset,
     handleResetAll,

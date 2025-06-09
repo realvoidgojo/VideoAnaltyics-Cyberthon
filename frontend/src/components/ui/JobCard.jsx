@@ -137,73 +137,72 @@ const JobCard = ({ job }) => {
   const heatmapModeAvailable = job.useHeatmap === true && hasHeatmapData;
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg border border-gray-200">
+    <div className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg border border-gray-200">
       <JobHeader job={job} onRemove={handleRemoveJob} />
 
       {isProcessing && (
-        <div className="px-6 py-4 bg-blue-50 border-y border-blue-100">
-          <div className="flex items-center">
-            <StatusIndicator status="processing" />
-            <span className="ml-2 text-sm text-blue-700">
-              {processingStage || "Processing video"}
-            </span>
+        <div className="px-6 py-5 bg-blue-50 border-b border-blue-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <StatusIndicator status="processing" />
+              <span className="ml-3 text-sm text-blue-700 font-medium">
+                {processingStage || "Processing video"}
+              </span>
+            </div>
             {estimatedTimeLeft !== null && (
-              <span className="ml-auto text-xs text-blue-600">
-                Estimated time left:{" "}
+              <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
                 {estimatedTimeLeft > 60
                   ? `${Math.floor(estimatedTimeLeft / 60)}m ${
                       estimatedTimeLeft % 60
                     }s`
-                  : `${estimatedTimeLeft}s`}
+                  : `${estimatedTimeLeft}s`} left
               </span>
             )}
           </div>
-          <ProgressBar
-            progress={progress}
-            processingStage={processingStage}
-            estimatedTimeLeft={estimatedTimeLeft}
-            useHeatmap={job.useHeatmap}
-          />
+          <div className="mt-4">
+            <ProgressBar
+              progress={progress}
+              processingStage={processingStage}
+              estimatedTimeLeft={estimatedTimeLeft}
+              useHeatmap={job.useHeatmap}
+            />
+          </div>
         </div>
       )}
 
-      {/* FIXED: Only show view mode selector if heatmap was requested */}
+      {/* View mode selector for heatmap-enabled jobs */}
       {heatmapModeAvailable ? (
-        <div className="flex p-3 bg-gray-50 border-t border-b border-gray-200">
-          <div
-            className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg cursor-pointer transition-all ${
-              !job.showHeatmap
-                ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium shadow-md"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-            onClick={() => job.showHeatmap && handleToggleHeatmapView()}
-            role="button"
-            tabIndex={0}
-          >
-            <VideoIcon className="h-5 w-5 mr-2" />
-            <span className="font-medium">Object Detection</span>
-          </div>
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <div className="flex space-x-2">
+            <button
+              className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                !job.showHeatmap
+                  ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+              onClick={() => job.showHeatmap && handleToggleHeatmapView()}
+            >
+              <VideoIcon className="h-5 w-5 mr-2" />
+              <span>Object Detection</span>
+            </button>
 
-          <div className="mx-2"></div>
-
-          <div
-            className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg cursor-pointer transition-all ${
-              job.showHeatmap
-                ? "bg-gradient-to-r from-green-500 to-green-600 text-white font-medium shadow-md"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-            onClick={() => !job.showHeatmap && handleToggleHeatmapView()}
-            role="button"
-            tabIndex={0}
-          >
-            <Activity className="h-5 w-5 mr-2" />
-            <span className="font-medium">Heatmap Analysis</span>
+            <button
+              className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                job.showHeatmap
+                  ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+              onClick={() => !job.showHeatmap && handleToggleHeatmapView()}
+            >
+              <Activity className="h-5 w-5 mr-2" />
+              <span>Heatmap Analysis</span>
+            </button>
           </div>
         </div>
       ) : (
         // When heatmap was not requested, show a simpler header
-        <div className="p-3 bg-gray-50 border-t border-b border-gray-200">
-          <div className="flex-1 flex items-center px-4 py-2">
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <div className="flex items-center">
             <VideoIcon className="h-5 w-5 mr-2 text-blue-500" />
             <span className="font-medium text-blue-700">
               Object Detection Results
@@ -212,7 +211,7 @@ const JobCard = ({ job }) => {
         </div>
       )}
 
-      {/* Conditional rendering based on view mode */}
+      {/* Content sections */}
       {heatmapModeAvailable && job.showHeatmap ? (
         <HeatmapViewSection
           taskID={job.serverTaskId}
@@ -228,61 +227,81 @@ const JobCard = ({ job }) => {
 };
 
 const ObjectDetectionViewSection = ({ taskID }) => (
-  <div className="border-t border-gray-200 bg-gray-50">
+  <div className="bg-white">
     {taskID && (
       <>
-        <div className="p-6 border-b border-gray-200 bg-white">
-          <div className="flex items-center mb-4">
-            <div className="bg-blue-100 p-2 rounded-md mr-3">
-              <VideoIcon className="h-5 w-5 text-blue-600" />
+        {/* Video Section */}
+        <div className="px-6 py-6 border-b border-gray-200">
+          <div className="flex items-center mb-5">
+            <div className="bg-blue-100 p-3 rounded-lg mr-4">
+              <VideoIcon className="h-6 w-6 text-blue-600" />
             </div>
-            <h2 className="text-lg font-medium text-gray-800">
-              Object Detection Video
-            </h2>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">
+                Object Detection Video
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Processed video with bounding boxes and labels
+              </p>
+            </div>
           </div>
 
-          <ServerRenderedVideo
-            taskID={taskID}
-            visible={true}
-            key={`detection-${taskID}`}
-          />
+          <div className="rounded-lg overflow-hidden border border-gray-200">
+            <ServerRenderedVideo
+              taskID={taskID}
+              visible={true}
+              key={`detection-${taskID}`}
+            />
+          </div>
 
-          <div className="mt-3 bg-blue-50 px-3 py-2 rounded text-sm text-blue-800 flex items-center">
-            <Info className="h-4 w-4 mr-2 text-blue-500" />
+          <div className="mt-4 bg-blue-50 px-4 py-3 rounded-lg text-sm text-blue-800 flex items-start">
+            <Info className="h-4 w-4 mr-2 text-blue-500 mt-0.5 flex-shrink-0" />
             <span>
-              Objects are highlighted with bounding boxes in this view
+              Objects are highlighted with bounding boxes in this view. Each detection includes confidence scores and class labels.
             </span>
           </div>
         </div>
 
-        <div className="p-6 bg-white">
-          <div className="flex items-center mb-4">
-            <div className="bg-blue-100 p-2 rounded-md mr-3">
-              <BarChart3Icon className="h-5 w-5 text-blue-600" />
+        {/* Statistics Section */}
+        <div className="px-6 py-6 border-b border-gray-200">
+          <div className="flex items-center mb-5">
+            <div className="bg-blue-100 p-3 rounded-lg mr-4">
+              <BarChart3Icon className="h-6 w-6 text-blue-600" />
             </div>
-            <h2 className="text-lg font-medium text-gray-800">
-              Detection Statistics
-            </h2>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">
+                Detection Statistics
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Analysis of detected objects and their frequencies
+              </p>
+            </div>
           </div>
 
           <DetectionStatistics taskID={taskID} key={`stats-${taskID}`} />
         </div>
 
-        {/* Add download section for consistency with heatmap view */}
-        <div className="p-6 bg-white border-t border-gray-200">
-          <div className="flex items-center mb-4">
-            <div className="bg-blue-100 p-2 rounded-md mr-3">
-              <Download className="h-5 w-5 text-blue-600" />
+        {/* Download Section */}
+        <div className="px-6 py-6">
+          <div className="flex items-center mb-5">
+            <div className="bg-blue-100 p-3 rounded-lg mr-4">
+              <Download className="h-6 w-6 text-blue-600" />
             </div>
-            <h2 className="text-lg font-medium text-gray-800">
-              Download Video
-            </h2>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">
+                Download Video
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Download the processed video with detections
+              </p>
+            </div>
           </div>
 
           <a
             href={`/download_processed_video/${taskID}`}
-            className="inline-block px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-center w-full md:w-auto"
+            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
           >
+            <Download className="h-4 w-4 mr-2" />
             Download Object Detection Video
           </a>
         </div>
@@ -297,73 +316,95 @@ const HeatmapViewSection = ({
   hasHeatmapData,
   heatmapAnalysis,
 }) => (
-  <div className="border-t border-gray-200 bg-gray-50">
-    <div className="p-6 border-b border-gray-200 bg-white">
-      <div className="flex items-center mb-4">
-        <div className="bg-green-100 p-2 rounded-md mr-3">
-          <Activity className="h-5 w-5 text-green-600" />
+  <div className="bg-white">
+    {/* Heatmap Analysis Section */}
+    <div className="px-6 py-6 border-b border-gray-200">
+      <div className="flex items-center mb-5">
+        <div className="bg-green-100 p-3 rounded-lg mr-4">
+          <Activity className="h-6 w-6 text-green-600" />
         </div>
-        <h2 className="text-lg font-medium text-gray-800">Heatmap Analysis</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800">Heatmap Analysis</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Movement patterns and activity insights
+          </p>
+        </div>
       </div>
 
       <HeatmapAnalysis heatmapData={heatmapAnalysis} taskID={taskID} />
 
-      <div className="mt-3 bg-green-50 px-3 py-2 rounded text-sm text-green-800 flex items-center">
-        <Info className="h-4 w-4 mr-2 text-green-500" />
+      <div className="mt-4 bg-green-50 px-4 py-3 rounded-lg text-sm text-green-800 flex items-start">
+        <Info className="h-4 w-4 mr-2 text-green-500 mt-0.5 flex-shrink-0" />
         <span>
-          Heatmap analysis shows movement patterns and intensity over time
+          Heatmap analysis shows movement patterns and intensity over time. Warmer colors indicate higher activity levels.
         </span>
       </div>
     </div>
 
-    <div className="p-6 border-b border-gray-200 bg-white">
-      <div className="flex items-center mb-4">
-        <div className="bg-green-100 p-2 rounded-md mr-3">
-          <VideoIcon className="h-5 w-5 text-green-600" />
+    {/* Heatmap Video Section */}
+    <div className="px-6 py-6 border-b border-gray-200">
+      <div className="flex items-center mb-5">
+        <div className="bg-green-100 p-3 rounded-lg mr-4">
+          <VideoIcon className="h-6 w-6 text-green-600" />
         </div>
-        <h2 className="text-lg font-medium text-gray-800">Heatmap Video</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800">Heatmap Video</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Visual representation of movement intensity
+          </p>
+        </div>
       </div>
 
       {taskID && (
-        <HeatmapVideo
-          taskID={taskID}
-          containerWidth={job.containerWidth}
-          visible={true}
-          key={`heatmap-${taskID}`}
-        />
+        <div className="rounded-lg overflow-hidden border border-gray-200">
+          <HeatmapVideo
+            taskID={taskID}
+            containerWidth={job.containerWidth}
+            visible={true}
+            key={`heatmap-${taskID}`}
+          />
+        </div>
       )}
 
-      <div className="mt-3 bg-green-50 px-3 py-2 rounded text-sm text-green-800 flex items-center">
-        <Info className="h-4 w-4 mr-2 text-green-500" />
+      <div className="mt-4 bg-green-50 px-4 py-3 rounded-lg text-sm text-green-800 flex items-start">
+        <Info className="h-4 w-4 mr-2 text-green-500 mt-0.5 flex-shrink-0" />
         <span>
-          Heat intensity represents areas with more movement or activity
+          Heat intensity represents areas with more movement or activity. Red areas show highest activity levels.
         </span>
       </div>
     </div>
 
+    {/* Download Options Section */}
     {taskID && (
-      <div className="p-6 bg-white">
-        <div className="flex items-center mb-4">
-          <div className="bg-green-100 p-2 rounded-md mr-3">
-            <Download className="h-5 w-5 text-green-600" />
+      <div className="px-6 py-6">
+        <div className="flex items-center mb-5">
+          <div className="bg-green-100 p-3 rounded-lg mr-4">
+            <Download className="h-6 w-6 text-green-600" />
           </div>
-          <h2 className="text-lg font-medium text-gray-800">
-            Download Options
-          </h2>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">
+              Download Options
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Download heatmap and detection videos
+            </p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <a
             href={`/download_heatmap_video/${taskID}`}
-            className="inline-block px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-center"
+            className="inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm font-medium"
           >
+            <Download className="h-4 w-4 mr-2" />
             Download Heatmap Video
           </a>
 
           <a
             href={`/download_processed_video/${taskID}`}
-            className="inline-block px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-center"
+            className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
           >
+            <Download className="h-4 w-4 mr-2" />
             Download Detection Video
           </a>
         </div>
