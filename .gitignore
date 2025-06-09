@@ -5,6 +5,8 @@ venv/
 # hls
 hls_stream/
 
+clip/
+
 # Python-related
 __pycache__/
 *.pyc
